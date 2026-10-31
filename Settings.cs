@@ -15,6 +15,7 @@ internal sealed class Settings
 
     public bool ShowMedia { get; set; } = true;
     public bool ShowVolume { get; set; } = true;
+    public bool ShowBrightness { get; set; } = true;
     public bool ShowBattery { get; set; } = true;
     public bool ShowCapsLock { get; set; } = true;
     public bool ShowClipboard { get; set; } = true;

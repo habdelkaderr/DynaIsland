@@ -37,6 +37,7 @@ public partial class MainWindow : Window
     private readonly MediaService _media;
     private readonly PowerService _power;
     private readonly AudioVolume _volume = new();
+    private readonly AudioVolume _mic = new(AudioVolume.Flow.Recording);
     private readonly Spring _w, _h, _r;
     private readonly SolidColorBrush _accent = new(ColorUtil.Neutral);
     private readonly DateTime _startedAt = DateTime.Now;
@@ -57,6 +58,9 @@ public partial class MainWindow : Window
     private DateTime _pausedSince = DateTime.MinValue;
     private float _lastVolume = -1;
     private bool _lastMuted;
+    private bool? _lastMicMuted;
+    private int _lastBrightness = -1;
+    private IntPtr _brightnessNotification;
     private bool? _lastCaps;
     private TimeSpan? _lastFrame;
     private bool _animating;
@@ -136,6 +140,10 @@ public partial class MainWindow : Window
 
         HwndSource.FromHwnd(_hwnd)?.AddHook(WndProc);
         Native.AddClipboardFormatListener(_hwnd);
+
+        // Event-driven brightness (built-in displays): Windows sends the current level right away, then on every change.
+        var brightness = Native.GUID_VIDEO_CURRENT_MONITOR_BRIGHTNESS;
+        _brightnessNotification = Native.RegisterPowerSettingNotification(_hwnd, ref brightness, Native.DEVICE_NOTIFY_WINDOW_HANDLE);
     }
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -145,14 +153,32 @@ public partial class MainWindow : Window
             _clipboardDebounce.Stop();
             _clipboardDebounce.Start();
         }
+        else if (msg == Native.WM_POWERBROADCAST && wParam.ToInt32() == Native.PBT_POWERSETTINGCHANGE &&
+                 Native.TryReadPowerSetting(lParam, out var setting, out int value) &&
+                 setting == Native.GUID_VIDEO_CURRENT_MONITOR_BRIGHTNESS)
+        {
+            OnBrightnessChanged(value);
+        }
         return IntPtr.Zero;
+    }
+
+    private void OnBrightnessChanged(int level)
+    {
+        bool first = _lastBrightness < 0;
+        bool changed = level != _lastBrightness;
+        _lastBrightness = level;
+        if (first || !changed || !_settings.ShowBrightness) return;
+
+        ShowAlert("", "Brightness", $"{level}", level / 100.0, ColorUtil.Neutral);
     }
 
     private void OnClosed(object? sender, EventArgs e)
     {
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         if (_hwnd != IntPtr.Zero) Native.RemoveClipboardFormatListener(_hwnd);
+        if (_brightnessNotification != IntPtr.Zero) Native.UnregisterPowerSettingNotification(_brightnessNotification);
         _tray?.Dispose();
+        _mic.Dispose();
         _volume.Dispose();
     }
 
@@ -445,6 +471,20 @@ public partial class MainWindow : Window
             }
         }
 
+        if (_settings.ShowVolume && _mic.TryRead(out _, out bool micMuted))
+        {
+            if (_lastMicMuted is bool previous && previous != micMuted && !_mic.DeviceChanged)
+            {
+                ShowAlert(micMuted ? "" : "", micMuted ? "Microphone muted" : "Microphone on", "", null,
+                    micMuted ? Red : ColorUtil.Neutral);
+            }
+            _lastMicMuted = micMuted;
+        }
+        else
+        {
+            _lastMicMuted = null;
+        }
+
         if (_settings.ShowCapsLock)
         {
             bool caps = Native.IsCapsLockOn();
@@ -585,7 +625,8 @@ public partial class MainWindow : Window
     private IReadOnlyList<MenuToggle> MenuToggles =>
     [
         new("Now playing", () => _settings.ShowMedia, v => _settings.ShowMedia = v),
-        new("Volume changes", () => _settings.ShowVolume, v => _settings.ShowVolume = v),
+        new("Volume & mute", () => _settings.ShowVolume, v => _settings.ShowVolume = v),
+        new("Brightness", () => _settings.ShowBrightness, v => _settings.ShowBrightness = v),
         new("Battery & charging", () => _settings.ShowBattery, v => _settings.ShowBattery = v),
         new("Caps Lock", () => _settings.ShowCapsLock, v => _settings.ShowCapsLock = v),
         new("Clipboard copies", () => _settings.ShowClipboard, v => _settings.ShowClipboard = v),

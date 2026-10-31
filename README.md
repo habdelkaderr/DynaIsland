@@ -8,7 +8,8 @@ Everything runs locally. The app makes no network calls, collects no telemetry a
 | Activity | Behaviour |
 |---|---|
 | **Now playing** | Album art and animated bars tinted from the cover art. Hover to expand to title, artist, source app, a seekable timeline and prev / play-pause / next. A new track briefly "peeks" wider. Works with anything that uses the Windows media overlay (Spotify, browsers/YouTube, Media Player, Apple Music, …). |
-| **Volume** | Pops a level bar when the system volume or mute changes. Scroll over the island to change the volume. |
+| **Volume & mute** | Pops a level bar when the system volume changes, plus "Muted" for speaker mute and "Microphone muted / on" for the default mic. This works for keyboard keys, the Windows slider and apps. Scroll over the island to change the volume. |
+| **Brightness** | Level bar when the built-in display's brightness changes (keys, slider, or adaptive brightness). Event-driven, so it costs nothing while idle. |
 | **Battery** | Charger plugged in/unplugged, plus a low-battery warning (laptops only). |
 | **Caps Lock** | On/off indicator. |
 | **Clipboard** | "Copied" with a short preview. Content that password managers mark as excluded from clipboard monitoring is never previewed. |
@@ -32,6 +33,7 @@ Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download).
 ```
 
 Use `-Install` for everyday use. Auto-start then points at a stable copy that later builds don't wipe.
+`-Install` first runs the new exe with `--self-test`. If Windows blocks the build, the installed copy is left running and untouched.
 
 > **Smart App Control:** run the single-file `publish\DynaIsland.exe`, not `dotnet run` or the `bin\` output.
 > A normal build loads a loose, unsigned `DynaIsland.dll`, which Smart App Control blocks. Smart App Control

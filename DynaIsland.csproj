@@ -14,7 +14,12 @@
     <RootNamespace>DynaIsland</RootNamespace>
     <AssemblyName>DynaIsland</AssemblyName>
     <Version>1.0.0</Version>
+    <ApplicationIcon>Assets\DynaIsland.ico</ApplicationIcon>
     <Product>DynaIsland</Product>
+    <AssemblyTitle>DynaIsland</AssemblyTitle>
+    <Company>Hatem Abdelkader</Company>
+    <Authors>Hatem Abdelkader</Authors>
+    <Copyright>Copyright © 2026 Hatem Abdelkader</Copyright>
     <Description>An Apple-style Dynamic Island for Windows.</Description>
     <!-- A small always-on overlay doesn't need a background GC thread. -->
     <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>

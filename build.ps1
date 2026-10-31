@@ -31,6 +31,18 @@ $exe = Join-Path $output 'DynaIsland.exe'
 Write-Host ("Built {0} ({1:N0} MB)" -f $exe, ((Get-Item $exe).Length / 1MB))
 
 if ($Install) {
+    # Smart App Control judges every new build separately. Check Windows will run this one before
+    # touching the installed copy, so a blocked build never replaces a working one.
+    try {
+        $probe = Start-Process $exe -ArgumentList '--self-test' -PassThru -Wait
+        if ($probe.ExitCode -ne 0) { throw "self-test exited with $($probe.ExitCode)" }
+    }
+    catch {
+        Write-Warning "Windows blocked this build (Smart App Control?): $($_.Exception.Message)"
+        Write-Warning 'The installed copy was left untouched and is still running.'
+        exit 1
+    }
+
     $target = Join-Path $env:LOCALAPPDATA 'Programs\DynaIsland'
     New-Item -ItemType Directory -Force $target | Out-Null
     Get-Process DynaIsland -ErrorAction SilentlyContinue | Stop-Process -Force

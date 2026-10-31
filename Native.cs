@@ -15,6 +15,12 @@ internal static class Native
     public const uint SWP_NOOWNERZORDER = 0x0200;
 
     public const int WM_CLIPBOARDUPDATE = 0x031D;
+    public const int WM_POWERBROADCAST = 0x0218;
+    public const int PBT_POWERSETTINGCHANGE = 0x8013;
+    public const int DEVICE_NOTIFY_WINDOW_HANDLE = 0;
+
+    /// <summary>Power setting that reports the built-in display's brightness (0-100) whenever it changes.</summary>
+    public static readonly Guid GUID_VIDEO_CURRENT_MONITOR_BRIGHTNESS = new("aded5e82-b909-4619-9949-f5d71dac0bcb");
     public const int VK_CAPITAL = 0x14;
 
     // SHQueryUserNotificationState results that mean "something is running full screen".
@@ -45,6 +51,22 @@ internal static class Native
 
     [DllImport("shell32.dll")]
     public static extern int SHQueryUserNotificationState(out int state);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr RegisterPowerSettingNotification(IntPtr hRecipient, ref Guid powerSettingGuid, int flags);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool UnregisterPowerSettingNotification(IntPtr handle);
+
+    /// <summary>Reads a POWERBROADCAST_SETTING { GUID PowerSetting; DWORD DataLength; UCHAR Data[] } with DWORD data.</summary>
+    public static bool TryReadPowerSetting(IntPtr lParam, out Guid setting, out int value)
+    {
+        setting = Marshal.PtrToStructure<Guid>(lParam);
+        int length = Marshal.ReadInt32(lParam, 16);
+        value = length >= 4 ? Marshal.ReadInt32(lParam, 20) : 0;
+        return length >= 4;
+    }
 
     public static bool IsCapsLockOn() => (GetKeyState(VK_CAPITAL) & 1) != 0;
 

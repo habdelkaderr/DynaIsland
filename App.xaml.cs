@@ -11,6 +11,13 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        // Used by build.ps1 to check Windows will run a new build before replacing the installed one.
+        if (e.Args.Contains("--self-test"))
+        {
+            Shutdown(0);
+            return;
+        }
+
         _singleInstance = new Mutex(true, @"Local\DynaIsland.SingleInstance", out bool isFirst);
         if (!isFirst)
         {

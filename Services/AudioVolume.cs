@@ -3,13 +3,18 @@ using System.Runtime.InteropServices;
 namespace DynaIsland.Services;
 
 /// <summary>
-/// Reads / writes the default playback device's master volume through Core Audio.
+/// Reads / writes the default playback (or recording) device's master volume and mute through Core Audio.
 /// Follows default-device switches (headphones, HDMI, ...).
 /// </summary>
-public sealed class AudioVolume : IDisposable
+public sealed class AudioVolume(AudioVolume.Flow flow = AudioVolume.Flow.Playback) : IDisposable
 {
+    public enum Flow
+    {
+        Playback = 0, // eRender
+        Recording = 1, // eCapture
+    }
+
     private static readonly Guid IID_IAudioEndpointVolume = new("5CDF2C82-841E-4546-9722-0CF74078229A");
-    private const int eRender = 0;
     private const int eMultimedia = 1;
     private const int CLSCTX_ALL = 0x17;
 
@@ -63,7 +68,7 @@ public sealed class AudioVolume : IDisposable
         _lastDeviceCheck = DateTime.UtcNow;
 
         _enumerator ??= (IMMDeviceEnumerator)new MMDeviceEnumeratorComObject();
-        if (_enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia, out var device) != 0 || device is null)
+        if (_enumerator.GetDefaultAudioEndpoint((int)flow, eMultimedia, out var device) != 0 || device is null)
         {
             ReleaseEndpoint();
             return;
