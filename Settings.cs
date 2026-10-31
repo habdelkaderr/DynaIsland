@@ -20,6 +20,10 @@ internal sealed class Settings
     public bool ShowClipboard { get; set; } = true;
     public bool HideInFullscreen { get; set; } = true;
     public bool HideWhenIdle { get; set; }
+    public bool ShowIsland { get; set; } = true;
+
+    /// <summary>Set once auto-start has been switched on by default, so turning it off sticks.</summary>
+    public bool AutoStartConfigured { get; set; }
 
     public static Settings Load()
     {

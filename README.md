@@ -16,7 +16,9 @@ Everything runs locally. The app makes no network calls, collects no telemetry a
 
 The island hides while a full-screen app or game is running. It never steals focus and doesn't appear in Alt+Tab or the taskbar.
 
-**Right-click the island** to toggle each activity, set "Start with Windows", turn on "Fade out when idle", or quit.
+**Tray icon:** DynaIsland adds an icon to the notification area. Left-click it to show or hide the island. Right-click it to toggle each activity, "Start with Windows", "Fade out when idle", or to quit. Windows 11 puts new icons in the hidden-icons overflow (**^**); drag it onto the taskbar, or turn it on under *Settings → Personalization → Taskbar → Other system tray icons*. Right-clicking the island opens the same options.
+
+**Starts with Windows:** the first run turns auto-start on (HKCU Run key, no admin needed). It points at whichever copy of `DynaIsland.exe` you last ran. You can switch it off from either menu or from Task Manager → Startup apps.
 
 Settings: `%APPDATA%\DynaIsland\settings.json` · Log: `%LOCALAPPDATA%\DynaIsland\log.txt`
 
@@ -26,7 +28,10 @@ Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download).
 
 ```powershell
 ./build.ps1                           # single self-contained .\publish\DynaIsland.exe
+./build.ps1 -Install                  # ...then install to %LOCALAPPDATA%\Programs\DynaIsland and start it
 ```
+
+Use `-Install` for everyday use. Auto-start then points at a stable copy that later builds don't wipe.
 
 > **Smart App Control:** run the single-file `publish\DynaIsland.exe`, not `dotnet run` or the `bin\` output.
 > A normal build loads a loose, unsigned `DynaIsland.dll`, which Smart App Control blocks. Smart App Control

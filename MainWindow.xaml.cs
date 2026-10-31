@@ -61,6 +61,7 @@ public partial class MainWindow : Window
     private TimeSpan? _lastFrame;
     private bool _animating;
     private int _slowTicks;
+    private TrayIcon? _tray;
 
     public MainWindow()
     {
@@ -95,6 +96,8 @@ public partial class MainWindow : Window
         Island.MouseLeave += (_, _) => _leaveTimer.Start();
         Island.MouseWheel += OnIslandWheel;
         Island.ContextMenu = BuildMenu();
+        _tray = new TrayIcon(MenuToggles, ApplyToggle, () => _settings.ShowIsland, SetIslandVisible, Close);
+        EnsureAutoStart();
 
         SourceInitialized += OnSourceInitialized;
         Loaded += async (_, _) =>
@@ -102,6 +105,7 @@ public partial class MainWindow : Window
             PositionWindow();
             ApplyShape();
             UpdateIdleOpacity();
+            ApplyVisibility();
             await _media.StartAsync();
         };
         Closed += OnClosed;
@@ -148,6 +152,7 @@ public partial class MainWindow : Window
     {
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         if (_hwnd != IntPtr.Zero) Native.RemoveClipboardFormatListener(_hwnd);
+        _tray?.Dispose();
         _volume.Dispose();
     }
 
@@ -457,19 +462,11 @@ public partial class MainWindow : Window
     {
         if (_state == IslandState.Clock) UpdateClock();
 
-        bool hide = _settings.HideInFullscreen && Native.IsFullscreenAppRunning();
-        if (hide != _fullscreenHidden)
+        bool fullscreen = _settings.HideInFullscreen && Native.IsFullscreenAppRunning();
+        if (fullscreen != _fullscreenHidden)
         {
-            _fullscreenHidden = hide;
-            if (hide)
-            {
-                Hide();
-            }
-            else
-            {
-                Show();
-                KeepOnTop();
-            }
+            _fullscreenHidden = fullscreen;
+            ApplyVisibility();
         }
 
         if (++_slowTicks % 3 == 0) KeepOnTop();
@@ -585,46 +582,111 @@ public partial class MainWindow : Window
 
     // ---- Settings menu -----------------------------------------------------------------------
 
+    private IReadOnlyList<MenuToggle> MenuToggles =>
+    [
+        new("Now playing", () => _settings.ShowMedia, v => _settings.ShowMedia = v),
+        new("Volume changes", () => _settings.ShowVolume, v => _settings.ShowVolume = v),
+        new("Battery & charging", () => _settings.ShowBattery, v => _settings.ShowBattery = v),
+        new("Caps Lock", () => _settings.ShowCapsLock, v => _settings.ShowCapsLock = v),
+        new("Clipboard copies", () => _settings.ShowClipboard, v => _settings.ShowClipboard = v),
+        new("Hide in full-screen apps", () => _settings.HideInFullscreen, v => _settings.HideInFullscreen = v, SeparatorBefore: true),
+        new("Fade out when idle", () => _settings.HideWhenIdle, v => _settings.HideWhenIdle = v),
+        new("Start with Windows", () => Settings.StartWithWindows, v => Settings.StartWithWindows = v),
+    ];
+
+    private void ApplyToggle(MenuToggle toggle, bool value)
+    {
+        try
+        {
+            toggle.Set(value);
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"toggle {toggle.Header}", ex);
+        }
+        _settings.Save();
+        _lastVolume = -1;
+        UpdateState();
+    }
+
     private ContextMenu BuildMenu()
     {
         var menu = new ContextMenu();
-        menu.Items.Add(Toggle("Now playing", () => _settings.ShowMedia, v => _settings.ShowMedia = v));
-        menu.Items.Add(Toggle("Volume changes", () => _settings.ShowVolume, v => _settings.ShowVolume = v));
-        menu.Items.Add(Toggle("Battery & charging", () => _settings.ShowBattery, v => _settings.ShowBattery = v));
-        menu.Items.Add(Toggle("Caps Lock", () => _settings.ShowCapsLock, v => _settings.ShowCapsLock = v));
-        menu.Items.Add(Toggle("Clipboard copies", () => _settings.ShowClipboard, v => _settings.ShowClipboard = v));
-        menu.Items.Add(new Separator());
-        menu.Items.Add(Toggle("Hide in full-screen apps", () => _settings.HideInFullscreen, v => _settings.HideInFullscreen = v));
-        menu.Items.Add(Toggle("Fade out when idle", () => _settings.HideWhenIdle, v => _settings.HideWhenIdle = v));
-
-        var startup = new MenuItem { Header = "Start with Windows", IsCheckable = true, StaysOpenOnClick = true };
-        menu.Opened += (_, _) => startup.IsChecked = Settings.StartWithWindows;
-        startup.Click += (_, _) =>
+        var items = new List<(MenuItem Item, MenuToggle Toggle)>();
+        foreach (var toggle in MenuToggles)
         {
-            try { Settings.StartWithWindows = startup.IsChecked; }
-            catch (Exception ex) { Log.Error("startup", ex); }
-            startup.IsChecked = Settings.StartWithWindows;
+            if (toggle.SeparatorBefore) menu.Items.Add(new Separator());
+            var item = new MenuItem { Header = toggle.Header, IsCheckable = true, StaysOpenOnClick = true };
+            item.Click += (_, _) =>
+            {
+                ApplyToggle(toggle, item.IsChecked);
+                item.IsChecked = toggle.Get();
+            };
+            menu.Items.Add(item);
+            items.Add((item, toggle));
+        }
+
+        // Keep the ticks in sync with changes made from the tray menu.
+        menu.Opened += (_, _) =>
+        {
+            foreach (var (item, toggle) in items) item.IsChecked = toggle.Get();
         };
-        menu.Items.Add(startup);
 
         menu.Items.Add(new Separator());
+        var hide = new MenuItem { Header = "Hide island (restore from tray)" };
+        hide.Click += (_, _) => SetIslandVisible(false);
+        menu.Items.Add(hide);
         var quit = new MenuItem { Header = "Quit DynaIsland" };
         quit.Click += (_, _) => Close();
         menu.Items.Add(quit);
         return menu;
     }
 
-    private MenuItem Toggle(string header, Func<bool> get, Action<bool> set)
+    private void SetIslandVisible(bool visible)
     {
-        var item = new MenuItem { Header = header, IsCheckable = true, IsChecked = get(), StaysOpenOnClick = true };
-        item.Click += (_, _) =>
+        _settings.ShowIsland = visible;
+        _settings.Save();
+        ApplyVisibility();
+    }
+
+    private void ApplyVisibility()
+    {
+        bool show = _settings.ShowIsland && !_fullscreenHidden;
+        if (show == IsVisible) return;
+        if (show)
         {
-            set(item.IsChecked);
-            _settings.Save();
-            _lastVolume = -1;
-            UpdateState();
-        };
-        return item;
+            Show();
+            KeepOnTop();
+        }
+        else
+        {
+            Hide();
+        }
+    }
+
+    /// <summary>
+    /// Turns auto-start on the first time the app runs, and keeps the Run entry pointing at
+    /// this exe if it was moved (for example after reinstalling to a new folder).
+    /// </summary>
+    private void EnsureAutoStart()
+    {
+        try
+        {
+            if (!_settings.AutoStartConfigured)
+            {
+                Settings.StartWithWindows = true;
+                _settings.AutoStartConfigured = true;
+                _settings.Save();
+            }
+            else if (Settings.StartWithWindows)
+            {
+                Settings.StartWithWindows = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error("auto-start", ex);
+        }
     }
 
     private static T Freeze<T>(T freezable) where T : Freezable
