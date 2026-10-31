@@ -4,63 +4,15 @@ using Forms = System.Windows.Forms;
 
 namespace DynaIsland;
 
-/// <summary>An on/off option shown in both the tray menu and the island's right-click menu.</summary>
-internal sealed record MenuToggle(string Header, Func<bool> Get, Action<bool> Set, bool SeparatorBefore = false);
-
-/// <summary>Notification-area icon with a menu to control the island.</summary>
+/// <summary>Notification-area icon. Left-click shows/hides the island; right-click opens the shared menu.</summary>
 internal sealed class TrayIcon : IDisposable
 {
     private readonly Forms.NotifyIcon _icon;
     private readonly Drawing.Icon _image;
 
-    public TrayIcon(IReadOnlyList<MenuToggle> toggles, Action<MenuToggle, bool> apply,
-                    Func<bool> isIslandVisible, Action<bool> setIslandVisible, Action quit)
+    public TrayIcon(Forms.ContextMenuStrip menu, Action onLeftClick)
     {
         _image = CreateIcon();
-
-        var menu = new Forms.ContextMenuStrip
-        {
-            Renderer = new DarkRenderer(),
-            ShowImageMargin = false,
-            ShowCheckMargin = true,
-            Font = new Drawing.Font("Segoe UI", 9.5f),
-        };
-
-        var title = new Forms.ToolStripLabel("DynaIsland") { Font = new Drawing.Font("Segoe UI Semibold", 9.5f) };
-        menu.Items.Add(title);
-        menu.Items.Add(new Forms.ToolStripSeparator());
-
-        var showIsland = new Forms.ToolStripMenuItem("Show island") { CheckOnClick = true };
-        showIsland.Click += (_, _) => setIslandVisible(showIsland.Checked);
-        menu.Items.Add(showIsland);
-        menu.Items.Add(new Forms.ToolStripSeparator());
-
-        var items = new List<(Forms.ToolStripMenuItem Item, MenuToggle Toggle)>();
-        foreach (var toggle in toggles)
-        {
-            if (toggle.SeparatorBefore) menu.Items.Add(new Forms.ToolStripSeparator());
-            var item = new Forms.ToolStripMenuItem(toggle.Header) { CheckOnClick = true };
-            item.Click += (_, _) =>
-            {
-                apply(toggle, item.Checked);
-                item.Checked = toggle.Get();
-            };
-            menu.Items.Add(item);
-            items.Add((item, toggle));
-        }
-
-        menu.Items.Add(new Forms.ToolStripSeparator());
-        var quitItem = new Forms.ToolStripMenuItem("Quit DynaIsland");
-        quitItem.Click += (_, _) => quit();
-        menu.Items.Add(quitItem);
-
-        // Keep the ticks in sync with changes made from the island's own menu.
-        menu.Opening += (_, _) =>
-        {
-            showIsland.Checked = isIslandVisible();
-            foreach (var (item, toggle) in items) item.Checked = toggle.Get();
-        };
-
         _icon = new Forms.NotifyIcon
         {
             Icon = _image,
@@ -70,14 +22,13 @@ internal sealed class TrayIcon : IDisposable
         };
         _icon.MouseClick += (_, e) =>
         {
-            if (e.Button == Forms.MouseButtons.Left) setIslandVisible(!isIslandVisible());
+            if (e.Button == Forms.MouseButtons.Left) onLeftClick();
         };
     }
 
     public void Dispose()
     {
         _icon.Visible = false;
-        _icon.ContextMenuStrip?.Dispose();
         _icon.Dispose();
         _image.Dispose();
     }
@@ -130,15 +81,31 @@ internal sealed class TrayIcon : IDisposable
     [DllImport("user32.dll")]
     private static extern bool DestroyIcon(IntPtr handle);
 
-    private sealed class DarkRenderer() : Forms.ToolStripProfessionalRenderer(new DarkColors())
+    /// <summary>Dark menu styling, used for every menu in the app via ToolStripManager.Renderer.</summary>
+    internal sealed class DarkRenderer() : Forms.ToolStripProfessionalRenderer(new DarkColors())
     {
         private static readonly Drawing.Color Text = Drawing.Color.FromArgb(240, 240, 242);
         private static readonly Drawing.Color DisabledText = Drawing.Color.FromArgb(120, 120, 126);
 
         protected override void OnRenderItemText(Forms.ToolStripItemTextRenderEventArgs e)
         {
-            e.TextColor = e.Item.Enabled ? Text : DisabledText;
+            e.TextColor = e.Item is Forms.ToolStripLabel ? DisabledText : e.Item.Enabled ? Text : DisabledText;
             base.OnRenderItemText(e);
+        }
+
+        // Drawn by hand: the stock renderer switches to the light system highlight for keyboard navigation.
+        protected override void OnRenderMenuItemBackground(Forms.ToolStripItemRenderEventArgs e)
+        {
+            if (!e.Item.Selected && !e.Item.Pressed) return;
+            var bounds = new Drawing.Rectangle(4, 1, e.Item.Width - 8, e.Item.Height - 2);
+            using var brush = new Drawing.SolidBrush(DarkColors.HighlightColor);
+            e.Graphics.FillRectangle(brush, bounds);
+        }
+
+        protected override void OnRenderArrow(Forms.ToolStripArrowRenderEventArgs e)
+        {
+            e.ArrowColor = Text;
+            base.OnRenderArrow(e);
         }
 
         protected override void OnRenderItemCheck(Forms.ToolStripItemImageRenderEventArgs e)
@@ -159,6 +126,7 @@ internal sealed class TrayIcon : IDisposable
     {
         private static readonly Drawing.Color Background = Drawing.Color.FromArgb(32, 32, 34);
         private static readonly Drawing.Color Highlight = Drawing.Color.FromArgb(56, 56, 60);
+        public static Drawing.Color HighlightColor => Highlight;
         private static readonly Drawing.Color Border = Drawing.Color.FromArgb(62, 62, 66);
 
         public override Drawing.Color ToolStripDropDownBackground => Background;
@@ -167,6 +135,8 @@ internal sealed class TrayIcon : IDisposable
         public override Drawing.Color MenuItemSelected => Highlight;
         public override Drawing.Color MenuItemSelectedGradientBegin => Highlight;
         public override Drawing.Color MenuItemSelectedGradientEnd => Highlight;
+        public override Drawing.Color MenuItemPressedGradientBegin => Highlight;
+        public override Drawing.Color MenuItemPressedGradientEnd => Highlight;
         public override Drawing.Color ImageMarginGradientBegin => Background;
         public override Drawing.Color ImageMarginGradientMiddle => Background;
         public override Drawing.Color ImageMarginGradientEnd => Background;

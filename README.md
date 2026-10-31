@@ -7,19 +7,34 @@ Everything runs locally. The app makes no network calls, collects no telemetry a
 
 | Activity | Behaviour |
 |---|---|
-| **Now playing** | Album art and animated bars tinted from the cover art. Hover to expand to title, artist, source app, a seekable timeline and prev / play-pause / next. A new track briefly "peeks" wider. Works with anything that uses the Windows media overlay (Spotify, browsers/YouTube, Media Player, Apple Music, …). |
-| **Volume & mute** | Pops a level bar when the system volume changes, plus "Muted" for speaker mute and "Microphone muted / on" for the default mic. This works for keyboard keys, the Windows slider and apps. Scroll over the island to change the volume. |
-| **Brightness** | Level bar when the built-in display's brightness changes (keys, slider, or adaptive brightness). Event-driven, so it costs nothing while idle. |
-| **Battery** | Charger plugged in/unplugged, plus a low-battery warning (laptops only). |
-| **Caps Lock** | On/off indicator. |
-| **Clipboard** | "Copied" with a short preview. Content that password managers mark as excluded from clipboard monitoring is never previewed. |
+| **Now playing** | Album art and animated bars tinted from the cover art. Hover to expand to title, artist, source app, a seekable timeline and prev / play-pause / next. **Swipe left/right** on the island to skip tracks. A new track briefly "peeks" wider. Works with anything that uses the Windows media overlay (Spotify, browsers/YouTube, Media Player, Apple Music, …). |
+| **Timer, focus, stopwatch** | Start from the menu (1 min to 1 hour, 25/50-min focus sessions, stopwatch). Shows the time in the compact pill. Hover for a progress ring, +1 minute, pause and stop. With music playing, the timer moves to a small bubble beside the island (like the iPhone's split island); click it for the controls. Chimes when done. |
+| **Notifications** | Mirrors new Windows notifications (Teams, WhatsApp, mail, …) with the app's real name and icon. Click to open the app. Read-only from the local notification database through Windows' own signed SQLite (`winsqlite3.dll`). Skipped during Do Not Disturb. |
+| **Calendar** | "In 10 min" and "Starting now" heads-ups from **classic Outlook**'s calendar while Outlook is running (local COM, never launches Outlook). The new Outlook has no local API, but its reminders still arrive as mirrored notifications. |
+| **Volume and mute** | Level bar for system volume, plus "Muted" for the speakers and "Microphone muted / on" for the default mic. Scroll over the island to change the volume. |
+| **Brightness** | Level bar when the built-in display's brightness changes. Event-driven. |
+| **Mic and camera in use** | Alert when an app starts using the mic or camera, plus an orange (mic) / green (camera) dot beside the island while it's in use. Uses the same registry data as Windows' privacy indicator; event-driven. |
+| **Bluetooth** | Connected / disconnected for paired devices, with battery level where the device reports it. |
+| **Network and VPN** | Connected to Wi-Fi/Ethernet (with network name), limited connection, offline, VPN on/off. |
+| **Screenshots** | Thumbnail when a screenshot is saved to *Pictures\Screenshots* (click to open), or "Image copied" for images copied to the clipboard. |
+| **Downloads** | "Downloading" and "Download complete" for browser downloads (Chrome/Edge `.crdownload`, Firefox/Zen `.part`). Click to show the file in Explorer. Explorer file copies can't be tracked (Windows exposes no API for them). |
+| **Keyboard layout** | Shows the new layout (e.g. العربية / English) when you switch. |
+| **Do Not Disturb** | On/off. |
+| **Battery, Caps Lock, clipboard** | Charger plugged/unplugged and low battery; Caps Lock on/off; "Copied" with a short preview (password-manager content is never previewed). |
 | **Clock** | Hovering the idle island shows the time, date and battery. |
 
 The island hides while a full-screen app or game is running. It never steals focus and doesn't appear in Alt+Tab or the taskbar.
 
-**Tray icon:** DynaIsland adds an icon to the notification area. Left-click it to show or hide the island. Right-click it to toggle each activity, "Start with Windows", "Fade out when idle", or to quit. Windows 11 puts new icons in the hidden-icons overflow (**^**); drag it onto the taskbar, or turn it on under *Settings → Personalization → Taskbar → Other system tray icons*. Right-clicking the island opens the same options.
+## Controls and settings
 
-**Starts with Windows:** the first run turns auto-start on (HKCU Run key, no admin needed). It points at whichever copy of `DynaIsland.exe` you last ran. You can switch it off from either menu or from Task Manager → Startup apps.
+**Tray icon:** left-click shows or hides the island; right-click opens the menu. Right-clicking the island opens the same menu. Windows 11 puts new icons in the hidden-icons overflow (**^**); drag it onto the taskbar to keep it visible.
+
+- **Timer:** start, pause/resume, +1 minute, stop.
+- **Show on island:** switch each activity on or off.
+- **Appearance:** theme (Black, Graphite, Translucent), size (Small, Default, Large), screen (main display, follow the active window, or a specific display), expand on hover or on click, fade out when idle, hide in full-screen apps, **low-memory mode**.
+- **Start with Windows:** on by default after the first run (HKCU Run key, no admin needed).
+
+**Low-memory mode** switches to software rendering: about **29 MB** instead of about 115 MB, using roughly twice the CPU while animating. That's still about 2–3% of one 20-thread CPU during non-stop animation, and nothing when idle.
 
 Settings: `%APPDATA%\DynaIsland\settings.json` · Log: `%LOCALAPPDATA%\DynaIsland\log.txt`
 
@@ -44,14 +59,25 @@ Use `-Install` for everyday use. Auto-start then points at a stable copy that la
 ## Project layout
 
 ```
-App.xaml(.cs)          single-instance startup, global styles (buttons, dark context menu)
-MainWindow.xaml(.cs)   the island: views, state machine, spring animation, system hooks
-Spring.cs              damped spring physics for the morphing shape
-ColorUtil.cs           accent colour extraction from album art
-Settings.cs            JSON settings + "Start with Windows" (HKCU Run key)
-Native.cs              Win32 interop (window styles, clipboard listener, full-screen detection)
-Services/MediaService  Windows media sessions (GlobalSystemMediaTransportControls)
-Services/AudioVolume   Core Audio endpoint volume (COM)
-Services/PowerService  battery / charger events (Windows.System.Power)
-Controls/Visualizer    animated equaliser bars
+App.xaml(.cs)                 single-instance startup, low-memory mode, restart, shared button style
+MainWindow.xaml(.cs)          views, state machine, spring animation, transient cards, gestures
+MainWindow.Media.cs           now playing
+MainWindow.Timer.cs           timer / focus / stopwatch, progress rings
+MainWindow.Activities.cs      system activity -> alerts and cards
+MainWindow.Menu.cs            shared menu, appearance, screens, visibility, auto-start
+TrayIcon.cs                   notification-area icon, dark menu renderer
+Spring.cs / ColorUtil.cs      spring physics; album-art accent colour
+Settings.cs / Native.cs       JSON settings; Win32 interop
+Services/MediaService         Windows media sessions (GSMTC)
+Services/AudioVolume          Core Audio volume and mute (speakers and mic)
+Services/PowerService         battery / charger events
+Services/TimerService         timer state
+Services/NotificationService  toast mirroring (read-only wpndatabase via winsqlite3)
+Services/ShellApps            app name and icon from an AppUserModelID
+Services/CalendarService      classic Outlook calendar (COM, read-only)
+Services/BluetoothService     paired device connect / disconnect / battery
+Services/NetworkService       Wi-Fi / Ethernet / offline / VPN
+Services/PrivacyService       mic / camera in use (registry change notifications)
+Services/FolderWatchService   downloads and screenshots folders
+Controls/Visualizer           animated equaliser bars
 ```

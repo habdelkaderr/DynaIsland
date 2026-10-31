@@ -1,4 +1,7 @@
+using System.Diagnostics;
 using System.Windows;
+using System.Windows.Interop;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace DynaIsland;
@@ -32,9 +35,22 @@ public partial class App : Application
             args.SetObserved();
         };
 
-        var window = new MainWindow();
+        var settings = Settings.Load();
+        if (settings.LowMemoryMode) RenderOptions.ProcessRenderMode = RenderMode.SoftwareOnly;
+
+        var window = new MainWindow(settings);
         MainWindow = window;
         window.Show();
+    }
+
+    /// <summary>Starts a fresh copy of the app and exits this one (for settings applied at start-up).</summary>
+    public void Restart()
+    {
+        _singleInstance?.ReleaseMutex();
+        _singleInstance?.Dispose();
+        _singleInstance = null;
+        if (Environment.ProcessPath is { } exe) Process.Start(new ProcessStartInfo(exe) { UseShellExecute = true });
+        Shutdown();
     }
 
     protected override void OnExit(ExitEventArgs e)

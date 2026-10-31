@@ -3,25 +3,58 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:c="clr-namespace:DynaIsland.Controls"
         Title="DynaIsland"
-        Width="560" Height="230"
+        Width="640" Height="240"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" Topmost="True" ShowInTaskbar="False" ShowActivated="False"
         Focusable="False" UseLayoutRounding="True"
         FontFamily="Segoe UI Variable Text, Segoe UI" Foreground="White">
 
-    <Grid>
+    <Grid x:Name="Root" Width="640" Height="240" HorizontalAlignment="Left" VerticalAlignment="Top">
+        <Grid.LayoutTransform>
+            <ScaleTransform x:Name="RootScale" ScaleX="1" ScaleY="1"/>
+        </Grid.LayoutTransform>
+
         <!-- Soft shadow drawn behind the island (kept separate so text stays crisp) -->
         <Border x:Name="Shadow" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,8,0,0"
-                Width="120" Height="30" CornerRadius="15" Background="Black" IsHitTestVisible="False">
+                Width="120" Height="30" CornerRadius="15" Background="Black" IsHitTestVisible="False" Opacity="0.55">
             <Border.Effect>
                 <BlurEffect Radius="16" KernelType="Gaussian"/>
             </Border.Effect>
         </Border>
 
+        <!-- Second "bubble" (like the iPhone's split island) for a timer running alongside music -->
+        <Border x:Name="SideBubble" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,6,0,0"
+                Width="34" Height="34" CornerRadius="17" Background="Black" Visibility="Collapsed"
+                Cursor="Hand" MouseLeftButtonUp="OnSideBubbleClick" Opacity="0">
+            <Border.RenderTransform>
+                <TranslateTransform x:Name="SideBubbleShift"/>
+            </Border.RenderTransform>
+            <Grid>
+                <Ellipse Width="26" Height="26" Stroke="#33FF9F0A" StrokeThickness="2.5"/>
+                <Path x:Name="SideRing" Stroke="{StaticResource TimerOrange}" StrokeThickness="2.5"
+                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                <TextBlock x:Name="SideGlyph" Text="&#xE916;" FontFamily="{StaticResource IconFont}" FontSize="11"
+                           Foreground="{StaticResource TimerOrange}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+
+        <!-- Microphone / camera in-use dots -->
+        <StackPanel x:Name="PrivacyDots" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Top"
+                    Margin="0,17,0,0" IsHitTestVisible="False" Visibility="Collapsed">
+            <StackPanel.RenderTransform>
+                <TranslateTransform x:Name="PrivacyShift"/>
+            </StackPanel.RenderTransform>
+            <Ellipse x:Name="CameraDot" Width="8" Height="8" Fill="#FF30D158" Visibility="Collapsed"/>
+            <Ellipse x:Name="MicDot" Width="8" Height="8" Fill="#FFFF9F0A" Margin="4,0,0,0" Visibility="Collapsed"/>
+        </StackPanel>
+
         <Border x:Name="Island" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,6,0,0"
                 Width="120" Height="30" CornerRadius="15" Background="Black"
                 BorderBrush="#14FFFFFF" BorderThickness="0.6">
             <Grid x:Name="Stage">
+                <Grid.RenderTransform>
+                    <TranslateTransform x:Name="StageNudge"/>
+                </Grid.RenderTransform>
 
                 <!-- Idle: the plain pill -->
                 <Grid x:Name="IdleView"/>
@@ -36,7 +69,7 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock x:Name="ClockTime" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"
-                                   FontFamily="Segoe UI Variable Display, Segoe UI"/>
+                                   FontFamily="{StaticResource DisplayFont}"/>
                         <TextBlock x:Name="ClockDate" Grid.Column="1" FontSize="13" Margin="10,1,0,0"
                                    Foreground="{StaticResource SubtleText}" VerticalAlignment="Center"/>
                         <StackPanel x:Name="ClockBattery" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
@@ -52,7 +85,7 @@
                 <Grid x:Name="CompactView" Width="280" Height="34" Visibility="Collapsed"
                       HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Border x:Name="CompactArt" Width="22" Height="22" CornerRadius="6" Margin="7,0,0,0"
-                            HorizontalAlignment="Left" Background="#FF2C2C2E">
+                            HorizontalAlignment="Left" Background="{StaticResource TileBackground}">
                         <TextBlock x:Name="CompactArtGlyph" Text="&#xE8D6;" FontFamily="{StaticResource IconFont}"
                                    FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"
                                    Foreground="{StaticResource SubtleText}"/>
@@ -70,7 +103,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <Border x:Name="PeekArt" Width="36" Height="36" CornerRadius="9" Background="#FF2C2C2E">
+                        <Border x:Name="PeekArt" Width="36" Height="36" CornerRadius="9" Background="{StaticResource TileBackground}">
                             <TextBlock x:Name="PeekArtGlyph" Text="&#xE8D6;" FontFamily="{StaticResource IconFont}"
                                        FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center"
                                        Foreground="{StaticResource SubtleText}"/>
@@ -101,7 +134,7 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <Border x:Name="ExpArt" CornerRadius="14" Background="#FF2C2C2E">
+                            <Border x:Name="ExpArt" CornerRadius="14" Background="{StaticResource TileBackground}">
                                 <TextBlock x:Name="ExpArtGlyph" Text="&#xE8D6;" FontFamily="{StaticResource IconFont}"
                                            FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"
                                            Foreground="{StaticResource SubtleText}"/>
@@ -110,8 +143,7 @@
                                 <TextBlock x:Name="ExpSource" FontSize="11" Foreground="{StaticResource FaintText}"
                                            TextTrimming="CharacterEllipsis" Margin="0,0,0,1"/>
                                 <TextBlock x:Name="ExpTitle" FontSize="16" FontWeight="SemiBold"
-                                           FontFamily="Segoe UI Variable Display, Segoe UI"
-                                           TextTrimming="CharacterEllipsis"/>
+                                           FontFamily="{StaticResource DisplayFont}" TextTrimming="CharacterEllipsis"/>
                                 <TextBlock x:Name="ExpArtist" FontSize="13" Foreground="{StaticResource SubtleText}"
                                            TextTrimming="CharacterEllipsis"/>
                             </StackPanel>
@@ -153,7 +185,92 @@
                     </Grid>
                 </Grid>
 
-                <!-- Transient alerts: volume, battery, caps lock, clipboard -->
+                <!-- Compact timer: icon left, time right (orange, like iOS) -->
+                <Grid x:Name="TimerView" Width="280" Height="34" Visibility="Collapsed"
+                      HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock x:Name="TimerGlyph" Text="&#xE916;" FontFamily="{StaticResource IconFont}" FontSize="15"
+                               Foreground="{StaticResource TimerOrange}" HorizontalAlignment="Left" Margin="13,0,0,0"
+                               VerticalAlignment="Center"/>
+                    <TextBlock x:Name="TimerCompactText" FontSize="15" FontWeight="SemiBold" FontFamily="{StaticResource DisplayFont}"
+                               Typography.NumeralAlignment="Tabular" Foreground="{StaticResource TimerOrange}"
+                               HorizontalAlignment="Right" Margin="0,0,15,0" VerticalAlignment="Center"/>
+                </Grid>
+
+                <!-- Expanded timer -->
+                <Grid x:Name="TimerExpandedView" Width="380" Height="84" Visibility="Collapsed"
+                      HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Grid Margin="16,0,16,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid Width="50" Height="50">
+                            <Ellipse Stroke="#33FF9F0A" StrokeThickness="4" Margin="2"/>
+                            <Path x:Name="TimerRing" Stroke="{StaticResource TimerOrange}" StrokeThickness="4"
+                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                            <TextBlock x:Name="TimerRingGlyph" Text="&#xE916;" FontFamily="{StaticResource IconFont}" FontSize="16"
+                                       Foreground="{StaticResource TimerOrange}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Grid>
+                        <StackPanel Grid.Column="1" Margin="14,0,8,0" VerticalAlignment="Center">
+                            <TextBlock x:Name="TimerLabel" FontSize="12" Foreground="{StaticResource SubtleText}"/>
+                            <TextBlock x:Name="TimerBigText" FontSize="30" FontWeight="SemiBold" FontFamily="{StaticResource DisplayFont}"
+                                       Typography.NumeralAlignment="Tabular" Foreground="{StaticResource TimerOrange}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button x:Name="TimerAddButton" Style="{StaticResource IconButton}" Content="+1"
+                                    FontFamily="{StaticResource DisplayFont}" FontSize="14" FontWeight="SemiBold"
+                                    Background="{StaticResource TileBackground}" Margin="0,0,8,0" Click="OnTimerAdd"/>
+                            <Button x:Name="TimerPauseButton" Style="{StaticResource IconButton}" Content="&#xE769;"
+                                    Background="#4DFF9F0A" Foreground="{StaticResource TimerOrange}" Margin="0,0,8,0"
+                                    Click="OnTimerPauseResume"/>
+                            <Button x:Name="TimerStopButton" Style="{StaticResource IconButton}" Content="&#xE711;"
+                                    Background="{StaticResource TileBackground}" FontSize="15" Click="OnTimerStop"/>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+
+                <!-- Notification / calendar / download card -->
+                <Grid x:Name="NotifyView" Width="400" Height="68" Visibility="Collapsed"
+                      HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Grid Margin="14,0,20,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid Width="38" Height="38">
+                            <Border x:Name="NotifyIconTile" CornerRadius="10" Background="{StaticResource TileBackground}"/>
+                            <TextBlock x:Name="NotifyGlyph" FontFamily="{StaticResource IconFont}" FontSize="18"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <Image x:Name="NotifyImage" Width="34" Height="34" RenderOptions.BitmapScalingMode="HighQuality"/>
+                        </Grid>
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                            <TextBlock x:Name="NotifyApp" FontSize="11" Foreground="{StaticResource FaintText}" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Name="NotifyTitle" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Name="NotifyBody" FontSize="12" Foreground="{StaticResource SubtleText}" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+
+                <!-- Screenshot preview -->
+                <Grid x:Name="ShotView" Width="360" Height="84" Visibility="Collapsed"
+                      HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Grid Margin="12,0,18,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border x:Name="ShotThumb" Width="106" Height="60" CornerRadius="9"
+                                Background="{StaticResource TileBackground}" BorderBrush="#33FFFFFF" BorderThickness="0.6"/>
+                        <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
+                            <TextBlock x:Name="ShotTitle" FontSize="14" FontWeight="SemiBold"/>
+                            <TextBlock x:Name="ShotSubtitle" FontSize="12" Foreground="{StaticResource SubtleText}"
+                                       TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+
+                <!-- Transient alerts: volume, brightness, battery, caps lock, clipboard, network, ... -->
                 <Grid x:Name="AlertView" Width="330" Height="44" Visibility="Collapsed"
                       HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Grid Margin="16,0,18,0">
@@ -165,7 +282,7 @@
                         <TextBlock x:Name="AlertIcon" FontFamily="{StaticResource IconFont}" FontSize="17"
                                    VerticalAlignment="Center"/>
                         <TextBlock x:Name="AlertText" Grid.Column="1" FontSize="13" FontWeight="SemiBold"
-                                   Margin="10,0,12,0" VerticalAlignment="Center"/>
+                                   Margin="10,0,12,0" VerticalAlignment="Center" MaxWidth="170" TextTrimming="CharacterEllipsis"/>
                         <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right"
                                     VerticalAlignment="Center">
                             <Grid x:Name="AlertBar" Width="96" Height="5" Margin="0,0,10,0" VerticalAlignment="Center">
@@ -178,7 +295,7 @@
                                 </Border>
                             </Grid>
                             <TextBlock x:Name="AlertValue" FontSize="12" Foreground="{StaticResource SubtleText}"
-                                       MaxWidth="160" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                       MaxWidth="150" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Grid>
                 </Grid>

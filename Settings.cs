@@ -5,7 +5,7 @@ using Microsoft.Win32;
 namespace DynaIsland;
 
 /// <summary>User preferences, stored locally in %APPDATA%\DynaIsland\settings.json.</summary>
-internal sealed class Settings
+public sealed class Settings
 {
     private static readonly string FilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DynaIsland", "settings.json");
@@ -19,9 +19,32 @@ internal sealed class Settings
     public bool ShowBattery { get; set; } = true;
     public bool ShowCapsLock { get; set; } = true;
     public bool ShowClipboard { get; set; } = true;
+    public bool ShowScreenshots { get; set; } = true;
+    public bool ShowDownloads { get; set; } = true;
+    public bool ShowNotifications { get; set; } = true;
+    public bool ShowCalendar { get; set; } = true;
+    public bool ShowBluetooth { get; set; } = true;
+    public bool ShowNetwork { get; set; } = true;
+    public bool ShowKeyboardLayout { get; set; } = true;
+    public bool ShowDoNotDisturb { get; set; } = true;
+    public bool ShowPrivacy { get; set; } = true;
+
     public bool HideInFullscreen { get; set; } = true;
     public bool HideWhenIdle { get; set; }
     public bool ShowIsland { get; set; } = true;
+    public bool ExpandOnHover { get; set; } = true;
+
+    /// <summary>Black, Graphite or Translucent.</summary>
+    public string Theme { get; set; } = "Black";
+
+    /// <summary>Small, Default or Large.</summary>
+    public string Size { get; set; } = "Default";
+
+    /// <summary>"Primary", "Follow" (screen of the active window) or a display device name like \\.\DISPLAY2.</summary>
+    public string Screen { get; set; } = "Primary";
+
+    /// <summary>Software rendering: less memory, slightly less smooth. Applied at start-up.</summary>
+    public bool LowMemoryMode { get; set; }
 
     /// <summary>Set once auto-start has been switched on by default, so turning it off sticks.</summary>
     public bool AutoStartConfigured { get; set; }
