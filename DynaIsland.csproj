@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <RootNamespace>DynaIsland</RootNamespace>
+    <AssemblyName>DynaIsland</AssemblyName>
+    <Version>1.0.0</Version>
+    <Product>DynaIsland</Product>
+    <Description>An Apple-style Dynamic Island for Windows.</Description>
+  </PropertyGroup>
+
+</Project>
