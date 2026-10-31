@@ -20,8 +20,10 @@ Set-Location $PSScriptRoot
 $output = Join-Path $PSScriptRoot 'publish'
 if (Test-Path $output) { Remove-Item $output -Recurse -Force }
 
+# No EnableCompressionInSingleFile: compressed bundles are unpacked into private memory at start-up
+# (~310 MB vs ~150 MB private bytes). Uncompressed, the libraries are mapped straight from the exe.
 dotnet publish DynaIsland.csproj -c $Configuration -r win-x64 --self-contained true `
-    -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true `
+    -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
     -p:DebugType=none -p:DebugSymbols=false -o $output
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed ($LASTEXITCODE)" }
 
