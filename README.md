@@ -25,11 +25,14 @@ Settings: `%APPDATA%\DynaIsland\settings.json` · Log: `%LOCALAPPDATA%\DynaIslan
 Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download).
 
 ```powershell
-dotnet run -c Release                 # run from source
-./build.ps1                           # publish to .\publish\DynaIsland.exe
+./build.ps1                           # single self-contained .\publish\DynaIsland.exe
 ```
 
-> **Smart App Control:** with Smart App Control enforced, Windows blocks locally built, unsigned binaries ("Part of this app has been blocked"). Turn Smart App Control off, or sign the build with a certificate from a trusted CA.
+> **Smart App Control:** run the single-file `publish\DynaIsland.exe`, not `dotnet run` or the `bin\` output.
+> A normal build loads a loose, unsigned `DynaIsland.dll`, which Smart App Control blocks. Smart App Control
+> also judges each unsigned exe build on its own (cloud reputation), so a given build may be allowed or
+> blocked ("An Application Control policy has blocked this file"). If a new build is blocked, Windows has
+> rejected that exact file. Keep the last build that ran.
 
 ## Project layout
 
