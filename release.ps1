@@ -71,9 +71,20 @@ $commit = (git rev-parse "$tag^{commit}" 2>$null)
 if (-not $commit) { throw "Tag $tag does not exist locally. Create and push it first." }
 if (-not (git ls-remote --tags origin "refs/tags/$tag")) { throw "Tag $tag is not on GitHub yet: git push origin $tag" }
 
+# Ask git (Git Credential Manager) for the saved login. Windows PowerShell prepends a byte-order mark to
+# anything it pipes or writes to a child's stdin, which git rejects, so the request (protocol and host
+# only, no secret) is fed from a file. The answer stays in memory.
 $env:GIT_TERMINAL_PROMPT = '0'
-$credential = "protocol=https`nhost=github.com`n`n" | git credential fill
-$token = ($credential | Where-Object { $_ -like 'password=*' } | Select-Object -First 1) -replace '^password=', ''
+$requestFile = [IO.Path]::GetTempFileName()
+try {
+    [IO.File]::WriteAllBytes($requestFile, [Text.Encoding]::ASCII.GetBytes("protocol=https`nhost=github.com`n`n"))
+    $credential = cmd /c "git credential fill < `"$requestFile`""
+}
+finally {
+    Remove-Item $requestFile -Force -ErrorAction SilentlyContinue
+}
+$token = "$($credential | Where-Object { $_ -like 'password=*' } | Select-Object -First 1)" -replace '^password=', ''
+$token = $token.Trim()
 if (-not $token) { throw 'No saved GitHub login found for git.' }
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12

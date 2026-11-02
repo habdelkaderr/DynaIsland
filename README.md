@@ -38,6 +38,10 @@ The island hides while a full-screen app or game is running. It never steals foc
 
 Settings: `%APPDATA%\DynaIsland\settings.json` · Log: `%LOCALAPPDATA%\DynaIsland\log.txt`
 
+## Download
+
+Get the portable zip from [Releases](https://github.com/habdelkaderr/DynaIsland/releases): extract it and run `DynaIsland.exe`. No installation or .NET runtime is needed. Each release lists SHA-256 fingerprints for the zip and the exe.
+
 ## Build & run
 
 Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download).
@@ -49,6 +53,16 @@ Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download).
 
 Use `-Install` for everyday use. Auto-start then points at a stable copy that later builds don't wipe.
 `-Install` first runs the new exe with `--self-test`. If Windows blocks the build, the installed copy is left running and untouched.
+
+**Making a release** (built and packaged on this PC; nothing is built in the cloud):
+
+```powershell
+./build.ps1                                         # build, then test the exe
+git tag -a v1.2.3 -m "DynaIsland 1.2.3"; git push origin v1.2.3   # version must match DynaIsland.csproj
+./release.ps1 -Publish                              # zip + SHA-256, create the GitHub release, upload
+```
+
+`release.ps1` ships the exe you already built and tested (it never rebuilds), and uses the GitHub login git already has saved. Optional highlights go in `docs/release-notes/v<version>.md`.
 
 > **Smart App Control:** run the single-file `publish\DynaIsland.exe`, not `dotnet run` or the `bin\` output.
 > A normal build loads a loose, unsigned `DynaIsland.dll`, which Smart App Control blocks. Smart App Control
