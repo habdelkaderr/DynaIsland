@@ -45,8 +45,8 @@ if ($Install) {
 
     $target = Join-Path $env:LOCALAPPDATA 'Programs\DynaIsland'
     New-Item -ItemType Directory -Force $target | Out-Null
-    Get-Process DynaIsland -ErrorAction SilentlyContinue | Stop-Process -Force
-    Start-Sleep -Milliseconds 500
+    # Wait for the old copy to exit fully, or the new one sees its single-instance lock and quits.
+    Get-Process DynaIsland -ErrorAction SilentlyContinue | ForEach-Object { $_.Kill(); $_.WaitForExit(5000) | Out-Null }
     Copy-Item $exe $target -Force
     $installed = Join-Path $target 'DynaIsland.exe'
     Start-Process explorer.exe $installed

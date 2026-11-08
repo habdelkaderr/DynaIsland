@@ -31,40 +31,24 @@ public partial class MainWindow
         MediaAiPanel.Children.Clear();
         foreach (var app in _aiApps)
         {
-            AiPanel.Children.Add(AiButton(app, compact: false));
-            MediaAiPanel.Children.Add(AiButton(app, compact: true));
+            AiPanel.Children.Add(AiButton(app));
+            MediaAiPanel.Children.Add(AiButton(app));
         }
         AiPanel.Visibility = _aiApps.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    private Button AiButton(AiApp app, bool compact)
+    /// <summary>Small icon-only button (the app's own icon); a soft circle appears on hover.</summary>
+    private Button AiButton(AiApp app)
     {
-        var icon = new Image { Source = app.Icon, Width = compact ? 18 : 18, Height = 18 };
+        var icon = new Image { Source = app.Icon, Width = 18, Height = 18 };
         RenderOptions.SetBitmapScalingMode(icon, BitmapScalingMode.HighQuality);
-        object content = icon;
-        if (!compact)
-        {
-            var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(10, 0, 12, 0) };
-            row.Children.Add(icon);
-            row.Children.Add(new TextBlock
-            {
-                Text = app.Name,
-                FontSize = 12.5,
-                FontFamily = (FontFamily)FindResource("DisplayFont"),
-                Margin = new Thickness(7, 0, 0, 1),
-                VerticalAlignment = VerticalAlignment.Center,
-            });
-            content = row;
-        }
-
         var button = new Button
         {
             Style = (Style)FindResource("IconButton"),
-            Content = content,
-            Width = compact ? 30 : double.NaN,
-            Height = compact ? 30 : 32,
-            Margin = new Thickness(0, 0, compact ? 4 : 8, 0),
-            Background = (Brush)FindResource("TileBackground"),
+            Content = icon,
+            Width = 30,
+            Height = 30,
+            Margin = new Thickness(1, 0, 1, 0),
             ToolTip = $"Ask {app.Name}",
         };
         button.Click += (_, _) => OpenChat(app);

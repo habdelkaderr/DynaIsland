@@ -4,9 +4,6 @@ using Microsoft.Win32;
 
 namespace DynaIsland;
 
-/// <summary>An app kept in the dock: launched via <see cref="Target"/>, matched to windows by AUMID or exe path.</summary>
-public sealed record DockPin(string Name, string Target, string? Aumid, string? Exe);
-
 /// <summary>User preferences, stored locally in %APPDATA%\DynaIsland\settings.json.</summary>
 public sealed class Settings
 {
@@ -57,18 +54,6 @@ public sealed class Settings
 
     /// <summary>Press Enter in the AI app after handing over the prompt (only when its message box has focus).</summary>
     public bool AiAutoSend { get; set; } = true;
-
-    public bool ShowDock { get; set; } = true;
-    public bool DockMagnify { get; set; } = true;
-
-    /// <summary>Reserve the dock's space so maximized windows stop above it (like the Windows taskbar).</summary>
-    public bool DockReserveSpace { get; set; } = true;
-
-    /// <summary>Auto-hide the Windows taskbar while DynaIsland runs (restored on quit).</summary>
-    public bool HideWindowsTaskbar { get; set; }
-
-    /// <summary>Apps kept in the dock. Null until first seeded from the Windows taskbar pins.</summary>
-    public List<DockPin>? DockPins { get; set; }
 
     /// <summary>Set once auto-start has been switched on by default, so turning it off sticks.</summary>
     public bool AutoStartConfigured { get; set; }

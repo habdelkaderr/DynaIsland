@@ -118,13 +118,11 @@ internal static class Native
     [DllImport("shcore.dll")]
     public static extern int GetDpiForMonitor(IntPtr hMonitor, int dpiType, out uint dpiX, out uint dpiY);
 
-    // ---- Window enumeration & control (dock, AI handoff) --------------------------------------
+    // ---- Window enumeration & control (AI handoff) ---------------------------------------------
 
     public const long WS_EX_TRANSPARENT = 0x00000020;
     public const long WS_EX_APPWINDOW = 0x00040000;
     public const int SW_RESTORE = 9;
-    public const int SW_MINIMIZE = 6;
-    public const int WM_CLOSE = 0x0010;
     private const uint GW_OWNER = 4;
     private const int DWMWA_CLOAKED = 14;
     private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
@@ -152,10 +150,6 @@ internal static class Native
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool ShowWindow(IntPtr hwnd, int cmd);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    public static extern bool PostMessage(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam);
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmGetWindowAttribute(IntPtr hwnd, int attribute, out int value, int size);
@@ -235,45 +229,6 @@ internal static class Native
     {
         foreach (var k in keys) keybd_event(k, 0, 0, UIntPtr.Zero);
         for (int i = keys.Length - 1; i >= 0; i--) keybd_event(keys[i], 0, 2, UIntPtr.Zero);
-    }
-
-    // ---- App bar (dock space reservation, Windows taskbar auto-hide) ---------------------------
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct APPBARDATA
-    {
-        public int cbSize;
-        public IntPtr hWnd;
-        public uint uCallbackMessage;
-        public uint uEdge;
-        public RECT rc;
-        public IntPtr lParam;
-    }
-
-    public const uint ABM_NEW = 0, ABM_REMOVE = 1, ABM_QUERYPOS = 2, ABM_SETPOS = 3, ABM_GETSTATE = 4, ABM_SETSTATE = 10;
-    public const uint ABE_BOTTOM = 3;
-    public const int ABS_AUTOHIDE = 1, ABS_ALWAYSONTOP = 2;
-    public const int ABN_POSCHANGED = 1, ABN_FULLSCREENAPP = 2;
-
-    [DllImport("shell32.dll")]
-    public static extern IntPtr SHAppBarMessage(uint message, ref APPBARDATA data);
-
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    public static extern uint RegisterWindowMessage(string name);
-
-    /// <summary>Windows taskbar auto-hide on/off.</summary>
-    public static bool TaskbarAutoHide
-    {
-        get
-        {
-            var data = new APPBARDATA { cbSize = Marshal.SizeOf<APPBARDATA>() };
-            return ((int)SHAppBarMessage(ABM_GETSTATE, ref data) & ABS_AUTOHIDE) != 0;
-        }
-        set
-        {
-            var data = new APPBARDATA { cbSize = Marshal.SizeOf<APPBARDATA>(), lParam = new IntPtr(value ? ABS_AUTOHIDE : ABS_ALWAYSONTOP) };
-            SHAppBarMessage(ABM_SETSTATE, ref data);
-        }
     }
 
     // ---- Misc -------------------------------------------------------------------------------

@@ -1,7 +1,5 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Runtime.InteropServices.ComTypes;
-using System.Text;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -9,7 +7,7 @@ namespace DynaIsland.Services;
 
 /// <summary>
 /// Shell helpers: app names and icons (from an AppUserModelID or any file path), the list of
-/// installed apps (shell:AppsFolder), window / shortcut AppUserModelIDs and shortcut targets.
+/// installed apps (shell:AppsFolder) and window AppUserModelIDs.
 /// Call from the UI (STA) thread.
 /// </summary>
 public static class ShellApps
@@ -96,28 +94,6 @@ public static class ShellApps
     {
         var iid = typeof(IPropertyStore).GUID;
         return SHGetPropertyStoreForWindow(hwnd, ref iid, out var store) == 0 ? ReadAumid(store) : null;
-    }
-
-    /// <summary>Target path and AppUserModelID of a .lnk shortcut.</summary>
-    public static (string? Target, string? Aumid) Shortcut(string lnkPath)
-    {
-        string? target = null, aumid = null;
-        try
-        {
-            var link = (IShellLinkW)new ShellLinkComObject();
-            ((IPersistFile)link).Load(lnkPath, 0);
-            var buffer = new StringBuilder(1024);
-            if (link.GetPath(buffer, buffer.Capacity, IntPtr.Zero, 0) == 0 && buffer.Length > 0) target = buffer.ToString();
-            Marshal.ReleaseComObject(link);
-
-            var iid = typeof(IPropertyStore).GUID;
-            if (SHGetPropertyStoreFromParsingName(lnkPath, IntPtr.Zero, 0, ref iid, out var store) == 0) aumid = ReadAumid(store);
-        }
-        catch (Exception ex)
-        {
-            Log.Error("shortcut", ex);
-        }
-        return (target, aumid);
     }
 
     /// <summary>Opens an app by AppUserModelID.</summary>
@@ -274,15 +250,6 @@ public static class ShellApps
         [PreserveSig] int GetValue(ref PROPERTYKEY key, out PROPVARIANT value);
     }
 
-    [ComImport, Guid("00021401-0000-0000-C000-000000000046")]
-    private class ShellLinkComObject;
-
-    [ComImport, Guid("000214F9-0000-0000-C000-000000000046"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private interface IShellLinkW
-    {
-        [PreserveSig] int GetPath([MarshalAs(UnmanagedType.LPWStr)] StringBuilder file, int max, IntPtr findData, uint flags);
-    }
-
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
     private static extern int SHCreateItemFromParsingName(string path, IntPtr pbc, ref Guid riid,
         [MarshalAs(UnmanagedType.Interface)] out IShellItem item);
@@ -293,10 +260,6 @@ public static class ShellApps
 
     [DllImport("shell32.dll")]
     private static extern int SHGetPropertyStoreForWindow(IntPtr hwnd, ref Guid riid,
-        [MarshalAs(UnmanagedType.Interface)] out IPropertyStore store);
-
-    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
-    private static extern int SHGetPropertyStoreFromParsingName(string path, IntPtr pbc, int flags, ref Guid riid,
         [MarshalAs(UnmanagedType.Interface)] out IPropertyStore store);
 
     [DllImport("ole32.dll")] private static extern int PropVariantClear(ref PROPVARIANT value);

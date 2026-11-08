@@ -64,12 +64,6 @@ public partial class MainWindow
             Toggle("Caps Lock", () => _settings.ShowCapsLock, v => _settings.ShowCapsLock = v),
             Toggle("Keyboard layout", () => _settings.ShowKeyboardLayout, v => _settings.ShowKeyboardLayout = v)));
 
-        menu.Items.Add(Submenu("Dock",
-            Toggle("Show the dock", () => _settings.ShowDock, v => { _settings.ShowDock = v; ApplyDock(); }),
-            Toggle("Magnify icons on hover", () => _settings.DockMagnify, v => _settings.DockMagnify = v),
-            Toggle("Keep windows above the dock", () => _settings.DockReserveSpace, v => { _settings.DockReserveSpace = v; ApplyDock(); }),
-            Toggle("Hide the Windows taskbar", () => _settings.HideWindowsTaskbar, v => { _settings.HideWindowsTaskbar = v; ApplyDock(); })));
-
         menu.Items.Add(Submenu("AI",
             Toggle("Send automatically after handing over", () => _settings.AiAutoSend, v => _settings.AiAutoSend = v)));
 
@@ -250,34 +244,6 @@ public partial class MainWindow
         ApplyAppearance();
     }
 
-    // ---- Dock & Windows taskbar --------------------------------------------------------------
-
-    private bool? _taskbarWasAutoHide;
-
-    private void ApplyDock()
-    {
-        _dock.Apply(CurrentMonitor(), _fullscreenHidden);
-
-        bool hideTaskbar = _settings.ShowDock && _settings.HideWindowsTaskbar;
-        if (hideTaskbar && _taskbarWasAutoHide is null)
-        {
-            _taskbarWasAutoHide = Native.TaskbarAutoHide;
-            Native.TaskbarAutoHide = true;
-        }
-        else if (!hideTaskbar)
-        {
-            RestoreTaskbar();
-        }
-    }
-
-    /// <summary>Puts the Windows taskbar back the way it was before DynaIsland hid it.</summary>
-    private void RestoreTaskbar()
-    {
-        if (_taskbarWasAutoHide is not bool was) return;
-        Native.TaskbarAutoHide = was;
-        _taskbarWasAutoHide = null;
-    }
-
     private IntPtr CurrentMonitor() =>
         _currentMonitor != IntPtr.Zero ? _currentMonitor : Native.MonitorFromPoint(new Native.POINT(), Native.MONITOR_DEFAULTTOPRIMARY);
 
@@ -321,9 +287,7 @@ public partial class MainWindow
         var rc = info.rcMonitor;
         int x = rc.Left + (rc.Right - rc.Left - width) / 2;
         Native.SetWindowPos(_hwnd, Native.HWND_TOPMOST, x, rc.Top, 0, 0, Native.SWP_NOSIZE | Native.SWP_NOACTIVATE);
-        bool moved = monitor != _currentMonitor;
         _currentMonitor = monitor;
-        if (moved && IsLoaded) ApplyDock(); // the dock follows the island's screen
     }
 
     // ---- Visibility & start-up ---------------------------------------------------------------

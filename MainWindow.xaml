@@ -63,13 +63,12 @@
                 <Grid x:Name="IdleView"/>
 
                 <!-- Home (hover with nothing playing): clock, calendar, AI shortcuts -->
-                <Grid x:Name="ClockView" Width="390" Height="152" Visibility="Collapsed"
+                <Grid x:Name="ClockView" Width="390" Height="112" Visibility="Collapsed"
                       HorizontalAlignment="Center" VerticalAlignment="Top">
-                    <Grid Margin="20,14,20,14">
+                    <Grid Margin="20,12,14,12">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
-                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -79,17 +78,20 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock x:Name="ClockTime" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center"
                                        FontFamily="{StaticResource DisplayFont}"/>
-                            <TextBlock x:Name="ClockDate" Grid.Column="1" FontSize="13" Margin="10,3,0,0"
-                                       Foreground="{StaticResource SubtleText}" VerticalAlignment="Center"/>
-                            <StackPanel x:Name="ClockBattery" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock x:Name="ClockBatteryText" FontSize="12" Foreground="{StaticResource SubtleText}"
-                                           VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                <TextBlock x:Name="ClockBatteryIcon" FontFamily="{StaticResource IconFont}" FontSize="16"
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="10,3,0,0" VerticalAlignment="Center">
+                                <TextBlock x:Name="ClockDate" FontSize="13" Foreground="{StaticResource SubtleText}"
                                            VerticalAlignment="Center"/>
+                                <StackPanel x:Name="ClockBattery" Orientation="Horizontal" Margin="10,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock x:Name="ClockBatteryIcon" FontFamily="{StaticResource IconFont}" FontSize="14"
+                                               VerticalAlignment="Center" Margin="0,1,4,0"/>
+                                    <TextBlock x:Name="ClockBatteryText" FontSize="12" Foreground="{StaticResource SubtleText}"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
                             </StackPanel>
+                            <!-- AI shortcuts: small icon-only buttons, top right -->
+                            <StackPanel x:Name="AiPanel" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center"/>
                         </Grid>
-                        <StackPanel x:Name="CalendarPanel" Grid.Row="1" Margin="0,8,0,8" VerticalAlignment="Center"/>
-                        <StackPanel x:Name="AiPanel" Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Left"/>
+                        <StackPanel x:Name="CalendarPanel" Grid.Row="1" Margin="0,8,6,0" VerticalAlignment="Center"/>
                     </Grid>
                 </Grid>
 

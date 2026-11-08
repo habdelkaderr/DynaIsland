@@ -17,7 +17,7 @@ public partial class MainWindow : Window
     private static readonly Dictionary<IslandState, (double W, double H, double R)> Shapes = new()
     {
         [IslandState.Idle] = (120, 30, 15),
-        [IslandState.Clock] = (390, 152, 38),
+        [IslandState.Clock] = (390, 112, 34),
         [IslandState.Chat] = (440, 58, 29),
         [IslandState.Compact] = (280, 34, 17),
         [IslandState.Peek] = (360, 54, 27),
@@ -56,7 +56,6 @@ public partial class MainWindow : Window
     private readonly CalendarService _calendar;
     private readonly SideHud _volumeHud = new(SideHud.Edge.Right);
     private readonly SideHud _brightnessHud = new(SideHud.Edge.Left);
-    private readonly DockWindow _dock;
     private readonly Spring _w, _h, _r;
     private readonly DateTime _startedAt = DateTime.Now;
     private readonly Forms.ContextMenuStrip _menu;
@@ -119,7 +118,6 @@ public partial class MainWindow : Window
         _calendar = new CalendarService(Dispatcher);
         _calendar.Upcoming += (_, meeting) => OnMeeting(meeting);
         _calendar.EventsChanged += (_, _) => UpdateCalendarUi();
-        _dock = new DockWindow(_settings, _settings.Save);
 
         _fastPoll = MakeTimer(120, PollInputs, start: true);
         _slowPoll = MakeTimer(1000, SlowTick, start: true);
@@ -150,7 +148,6 @@ public partial class MainWindow : Window
             ApplyShape();
             UpdateIdleOpacity();
             ApplyVisibility();
-            ApplyDock();
             UpdateCalendarUi();
             await Dispatcher.InvokeAsync(LoadAiApps, DispatcherPriority.Background);
             await _media.StartAsync();
@@ -228,10 +225,8 @@ public partial class MainWindow : Window
         _folders.Dispose();
         _notifications.Dispose();
         _calendar.Dispose();
-        _dock.Close();
         _volumeHud.Close();
         _brightnessHud.Close();
-        RestoreTaskbar();
     }
 
     private void OnDisplaySettingsChanged(object? sender, EventArgs e) => Dispatcher.InvokeAsync(PositionWindow);
@@ -260,7 +255,6 @@ public partial class MainWindow : Window
         {
             _fullscreenHidden = fullscreen;
             ApplyVisibility();
-            ApplyDock();
         }
 
         CheckDoNotDisturb();

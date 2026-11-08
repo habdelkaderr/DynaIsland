@@ -1,10 +1,6 @@
 namespace DynaIsland.Services;
 
-public sealed record AppWindow(IntPtr Handle, string Title, string? Exe, string? Aumid)
-{
-    /// <summary>Groups windows of the same app: AppUserModelID when known, otherwise the exe path.</summary>
-    public string Key => (Aumid ?? Exe ?? Handle.ToString()).ToLowerInvariant();
-}
+public sealed record AppWindow(IntPtr Handle, string Title, string? Exe, string? Aumid);
 
 /// <summary>Top-level app windows (the ones Alt+Tab shows), front to back.</summary>
 public static class WindowTracker
@@ -33,13 +29,6 @@ public static class WindowTracker
             result.Add(new AppWindow(hwnd, Native.WindowTitle(hwnd), identity.Path, aumid));
         }
         return result;
-    }
-
-    /// <summary>Whether a window belongs to the app identified by an AUMID and/or exe path.</summary>
-    public static bool Matches(AppWindow window, string? aumid, string? exe)
-    {
-        if (aumid is not null && string.Equals(window.Aumid, aumid, StringComparison.OrdinalIgnoreCase)) return true;
-        return !string.IsNullOrEmpty(exe) && string.Equals(window.Exe, exe, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Brings a window to the front, restoring it if minimized.</summary>
