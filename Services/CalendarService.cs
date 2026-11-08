@@ -5,12 +5,15 @@ using System.Windows.Threading;
 
 namespace DynaIsland.Services;
 
-public sealed record Meeting(string Subject, string Location, DateTime Start, int MinutesAway);
+public sealed record Meeting(string Subject, string Location, DateTime Start, DateTime End, int MinutesAway)
+{
+    public bool IsNow => MinutesAway <= 0 && End > DateTime.Now;
+}
 
 /// <summary>
-/// Upcoming-meeting heads-up from classic Outlook's calendar (local COM, only while Outlook is already
-/// running; it is never launched). The new Outlook has no local API, but its reminders still arrive
-/// through notification mirroring.
+/// Calendar from classic Outlook (local COM, only while Outlook is already running; it is never
+/// launched): the next events for the Home card, plus heads-ups 10 minutes before and at start.
+/// The new Outlook has no local API, but its reminders still arrive through notification mirroring.
 /// </summary>
 public sealed class CalendarService : IDisposable
 {
@@ -19,13 +22,22 @@ public sealed class CalendarService : IDisposable
     private readonly HashSet<string> _announced = [];
     private int _busy;
 
+    /// <summary>Upcoming events (ongoing first), at most six, within the next 24 hours.</summary>
+    public IReadOnlyList<Meeting> Events { get; private set; } = [];
+
+    /// <summary>Whether classic Outlook was running at the last check.</summary>
+    public bool OutlookRunning { get; private set; }
+
     /// <summary>Raised on the UI thread 10 minutes before and when a meeting starts.</summary>
     public event EventHandler<Meeting>? Upcoming;
+
+    /// <summary>Raised on the UI thread when <see cref="Events"/> or <see cref="OutlookRunning"/> change.</summary>
+    public event EventHandler? EventsChanged;
 
     public CalendarService(Dispatcher ui)
     {
         _ui = ui;
-        _timer = new Timer(_ => Check(), null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(30));
+        _timer = new Timer(_ => Check(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30));
     }
 
     private void Check()
@@ -33,15 +45,25 @@ public sealed class CalendarService : IDisposable
         if (Interlocked.Exchange(ref _busy, 1) == 1) return;
         try
         {
-            if (Process.GetProcessesByName("OUTLOOK").Length == 0) return;
-            foreach (var meeting in ReadUpcoming())
+            bool running = Process.GetProcessesByName("OUTLOOK").Length > 0;
+            var events = running ? ReadEvents() : [];
+
+            foreach (var meeting in events)
             {
                 // One heads-up at <= 10 minutes and one at start.
-                string stage = meeting.MinutesAway <= 0 ? "now" : meeting.MinutesAway <= 10 ? "soon" : "";
+                string stage = meeting.MinutesAway <= 0 && meeting.MinutesAway > -2 ? "now" : meeting.MinutesAway is > 0 and <= 10 ? "soon" : "";
                 if (stage.Length == 0) continue;
                 if (!_announced.Add($"{meeting.Subject}|{meeting.Start:O}|{stage}")) continue;
                 _ui.InvokeAsync(() => Upcoming?.Invoke(this, meeting));
             }
+
+            _ui.InvokeAsync(() =>
+            {
+                bool changed = running != OutlookRunning || !events.SequenceEqual(Events);
+                OutlookRunning = running;
+                Events = events;
+                if (changed) EventsChanged?.Invoke(this, EventArgs.Empty);
+            });
         }
         catch (Exception ex)
         {
@@ -53,7 +75,7 @@ public sealed class CalendarService : IDisposable
         }
     }
 
-    private static List<Meeting> ReadUpcoming()
+    private static List<Meeting> ReadEvents()
     {
         var result = new List<Meeting>();
         if (GetActive("Outlook.Application") is not { } outlook) return result;
@@ -67,18 +89,19 @@ public sealed class CalendarService : IDisposable
 
         var now = DateTime.Now;
         var culture = CultureInfo.CurrentCulture; // Outlook parses Restrict dates in the user's locale
-        string filter = $"[Start] >= '{now.AddMinutes(-2).ToString("g", culture)}' AND [Start] <= '{now.AddMinutes(11).ToString("g", culture)}'";
+        string filter = $"[End] >= '{now.ToString("g", culture)}' AND [Start] <= '{now.AddHours(24).ToString("g", culture)}'";
         dynamic found = items.Restrict(filter);
 
         dynamic? item = found.GetFirst();
         int guard = 0;
-        while (item is not null && guard++ < 25)
+        while (item is not null && guard++ < 40 && result.Count < 6)
         {
             if (!(bool)item.AllDayEvent)
             {
                 DateTime start = item.Start;
+                DateTime end = item.End;
                 int minutes = (int)Math.Ceiling((start - now).TotalMinutes);
-                result.Add(new Meeting((string)(item.Subject ?? ""), (string)(item.Location ?? ""), start, minutes));
+                result.Add(new Meeting((string)(item.Subject ?? ""), (string)(item.Location ?? ""), start, end, minutes));
             }
             item = found.GetNext();
         }

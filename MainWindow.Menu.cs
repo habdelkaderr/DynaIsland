@@ -64,7 +64,19 @@ public partial class MainWindow
             Toggle("Caps Lock", () => _settings.ShowCapsLock, v => _settings.ShowCapsLock = v),
             Toggle("Keyboard layout", () => _settings.ShowKeyboardLayout, v => _settings.ShowKeyboardLayout = v)));
 
+        menu.Items.Add(Submenu("Dock",
+            Toggle("Show the dock", () => _settings.ShowDock, v => { _settings.ShowDock = v; ApplyDock(); }),
+            Toggle("Magnify icons on hover", () => _settings.DockMagnify, v => _settings.DockMagnify = v),
+            Toggle("Keep windows above the dock", () => _settings.DockReserveSpace, v => { _settings.DockReserveSpace = v; ApplyDock(); }),
+            Toggle("Hide the Windows taskbar", () => _settings.HideWindowsTaskbar, v => { _settings.HideWindowsTaskbar = v; ApplyDock(); })));
+
+        menu.Items.Add(Submenu("AI",
+            Toggle("Send automatically after handing over", () => _settings.AiAutoSend, v => _settings.AiAutoSend = v)));
+
         menu.Items.Add(Submenu("Appearance",
+            Submenu("Shape",
+                Radio("Floating island", !IsNotch, () => SetShape("Island")),
+                Radio("Notch (joined to the top edge)", IsNotch, () => SetShape("Notch"))),
             Submenu("Theme",
                 Radio("Black", _settings.Theme == "Black", () => SetTheme("Black")),
                 Radio("Graphite", _settings.Theme == "Graphite", () => SetTheme("Graphite")),
@@ -75,6 +87,7 @@ public partial class MainWindow
                 Radio("Large", _settings.Size == "Large", () => SetSize("Large"))),
             ScreenMenu(),
             new Forms.ToolStripSeparator(),
+            Toggle("Volume and brightness pop out from the screen edges", () => _settings.SidePopups, v => _settings.SidePopups = v),
             Toggle("Expand on hover (off: click)", () => _settings.ExpandOnHover, v => { _settings.ExpandOnHover = v; _pinned = false; }),
             Toggle("Fade out when idle", () => _settings.HideWhenIdle, v => _settings.HideWhenIdle = v),
             Toggle("Hide in full-screen apps", () => _settings.HideInFullscreen, v => _settings.HideInFullscreen = v),
@@ -221,11 +234,52 @@ public partial class MainWindow
             _ => (Colors.Black, Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF)),
         };
         var fill = Freeze(new SolidColorBrush(background));
-        Island.Background = SideBubble.Background = fill;
-        Island.BorderBrush = Freeze(new SolidColorBrush(border));
-        Shadow.BeginAnimation(OpacityProperty, new DoubleAnimation(_faded ? 0 : ShadowOpacity, TimeSpan.FromMilliseconds(200)));
+        IslandShape.Fill = SideBubble.Background = fill;
+        _volumeHud.SetFill(fill);
+        _brightnessHud.SetFill(fill);
+        // A notch blends into the screen edge, so no outline there.
+        IslandShape.Stroke = IsNotch ? Brushes.Transparent : Freeze(new SolidColorBrush(border));
+        ShadowHost.BeginAnimation(OpacityProperty, new DoubleAnimation(_faded ? 0 : ShadowOpacity, TimeSpan.FromMilliseconds(200)));
+        ApplyShapeMode();
         PositionWindow();
     }
+
+    private void SetShape(string shape)
+    {
+        _settings.Shape = shape;
+        ApplyAppearance();
+    }
+
+    // ---- Dock & Windows taskbar --------------------------------------------------------------
+
+    private bool? _taskbarWasAutoHide;
+
+    private void ApplyDock()
+    {
+        _dock.Apply(CurrentMonitor(), _fullscreenHidden);
+
+        bool hideTaskbar = _settings.ShowDock && _settings.HideWindowsTaskbar;
+        if (hideTaskbar && _taskbarWasAutoHide is null)
+        {
+            _taskbarWasAutoHide = Native.TaskbarAutoHide;
+            Native.TaskbarAutoHide = true;
+        }
+        else if (!hideTaskbar)
+        {
+            RestoreTaskbar();
+        }
+    }
+
+    /// <summary>Puts the Windows taskbar back the way it was before DynaIsland hid it.</summary>
+    private void RestoreTaskbar()
+    {
+        if (_taskbarWasAutoHide is not bool was) return;
+        Native.TaskbarAutoHide = was;
+        _taskbarWasAutoHide = null;
+    }
+
+    private IntPtr CurrentMonitor() =>
+        _currentMonitor != IntPtr.Zero ? _currentMonitor : Native.MonitorFromPoint(new Native.POINT(), Native.MONITOR_DEFAULTTOPRIMARY);
 
     // ---- Screens -----------------------------------------------------------------------------
 
@@ -267,7 +321,9 @@ public partial class MainWindow
         var rc = info.rcMonitor;
         int x = rc.Left + (rc.Right - rc.Left - width) / 2;
         Native.SetWindowPos(_hwnd, Native.HWND_TOPMOST, x, rc.Top, 0, 0, Native.SWP_NOSIZE | Native.SWP_NOACTIVATE);
+        bool moved = monitor != _currentMonitor;
         _currentMonitor = monitor;
+        if (moved && IsLoaded) ApplyDock(); // the dock follows the island's screen
     }
 
     // ---- Visibility & start-up ---------------------------------------------------------------

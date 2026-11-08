@@ -15,12 +15,14 @@
         </Grid.LayoutTransform>
 
         <!-- Soft shadow drawn behind the island (kept separate so text stays crisp) -->
-        <Border x:Name="Shadow" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,8,0,0"
-                Width="120" Height="30" CornerRadius="15" Background="Black" IsHitTestVisible="False" Opacity="0.55">
-            <Border.Effect>
-                <BlurEffect Radius="16" KernelType="Gaussian"/>
-            </Border.Effect>
-        </Border>
+        <Grid x:Name="ShadowHost" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,8,0,0"
+              Width="120" Height="30" IsHitTestVisible="False" Opacity="0.55">
+            <Path x:Name="ShadowShape" Fill="Black" Width="120" Height="30" HorizontalAlignment="Left" VerticalAlignment="Top">
+                <Path.Effect>
+                    <BlurEffect Radius="16" KernelType="Gaussian"/>
+                </Path.Effect>
+            </Path>
+        </Grid>
 
         <!-- Second "bubble" (like the iPhone's split island) for a timer running alongside music -->
         <Border x:Name="SideBubble" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,6,0,0"
@@ -48,9 +50,10 @@
             <Ellipse x:Name="MicDot" Width="8" Height="8" Fill="#FFFF9F0A" Margin="4,0,0,0" Visibility="Collapsed"/>
         </StackPanel>
 
-        <Border x:Name="Island" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,6,0,0"
-                Width="120" Height="30" CornerRadius="15" Background="Black"
-                BorderBrush="#14FFFFFF" BorderThickness="0.6">
+        <!-- The island: a vector outline (floating pill, or a notch joined to the top edge) plus its content -->
+        <Grid x:Name="Island" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,6,0,0" Width="120" Height="30">
+            <Path x:Name="IslandShape" Fill="Black" Stroke="#14FFFFFF" StrokeThickness="0.6"
+                  Width="120" Height="30" HorizontalAlignment="Left" VerticalAlignment="Top"/>
             <Grid x:Name="Stage">
                 <Grid.RenderTransform>
                     <TranslateTransform x:Name="StageNudge"/>
@@ -59,25 +62,57 @@
                 <!-- Idle: the plain pill -->
                 <Grid x:Name="IdleView"/>
 
-                <!-- Hover with nothing playing: clock -->
-                <Grid x:Name="ClockView" Width="300" Height="42" Visibility="Collapsed"
+                <!-- Home (hover with nothing playing): clock, calendar, AI shortcuts -->
+                <Grid x:Name="ClockView" Width="390" Height="152" Visibility="Collapsed"
+                      HorizontalAlignment="Center" VerticalAlignment="Top">
+                    <Grid Margin="20,14,20,14">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="ClockTime" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center"
+                                       FontFamily="{StaticResource DisplayFont}"/>
+                            <TextBlock x:Name="ClockDate" Grid.Column="1" FontSize="13" Margin="10,3,0,0"
+                                       Foreground="{StaticResource SubtleText}" VerticalAlignment="Center"/>
+                            <StackPanel x:Name="ClockBattery" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock x:Name="ClockBatteryText" FontSize="12" Foreground="{StaticResource SubtleText}"
+                                           VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                <TextBlock x:Name="ClockBatteryIcon" FontFamily="{StaticResource IconFont}" FontSize="16"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+                        <StackPanel x:Name="CalendarPanel" Grid.Row="1" Margin="0,8,0,8" VerticalAlignment="Center"/>
+                        <StackPanel x:Name="AiPanel" Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Left"/>
+                    </Grid>
+                </Grid>
+
+                <!-- AI prompt box: Enter hands the text to the app -->
+                <Grid x:Name="ChatView" Width="440" Height="58" Visibility="Collapsed"
                       HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Grid Margin="18,0">
+                    <Grid Margin="14,0,12,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="ClockTime" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"
-                                   FontFamily="{StaticResource DisplayFont}"/>
-                        <TextBlock x:Name="ClockDate" Grid.Column="1" FontSize="13" Margin="10,1,0,0"
-                                   Foreground="{StaticResource SubtleText}" VerticalAlignment="Center"/>
-                        <StackPanel x:Name="ClockBattery" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock x:Name="ClockBatteryText" FontSize="12" Foreground="{StaticResource SubtleText}"
-                                       VerticalAlignment="Center" Margin="0,0,6,0"/>
-                            <TextBlock x:Name="ClockBatteryIcon" FontFamily="{StaticResource IconFont}" FontSize="16"
-                                       VerticalAlignment="Center"/>
-                        </StackPanel>
+                        <Image x:Name="ChatIcon" Width="26" Height="26" RenderOptions.BitmapScalingMode="HighQuality"/>
+                        <Grid Grid.Column="1" Margin="12,0,10,0" VerticalAlignment="Center">
+                            <TextBlock x:Name="ChatPlaceholder" FontSize="14" Foreground="{StaticResource FaintText}"
+                                       IsHitTestVisible="False" VerticalAlignment="Center"/>
+                            <TextBox x:Name="ChatInput" FontSize="14" Foreground="White" CaretBrush="White"
+                                     Background="Transparent" BorderThickness="0" Padding="0" VerticalAlignment="Center"
+                                     TextChanged="OnChatTextChanged" PreviewKeyDown="OnChatKeyDown"/>
+                        </Grid>
+                        <Button x:Name="ChatSend" Grid.Column="2" Style="{StaticResource IconButton}" Content="&#xE724;"
+                                Width="34" Height="34" FontSize="14" Background="{StaticResource TileBackground}"
+                                Click="OnChatSend"/>
                     </Grid>
                 </Grid>
 
@@ -173,15 +208,18 @@
                                        Foreground="{StaticResource SubtleText}" VerticalAlignment="Center"/>
                         </Grid>
 
-                        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center"
-                                    VerticalAlignment="Center">
-                            <Button x:Name="PrevButton" Style="{StaticResource IconButton}" Content="&#xE892;"
-                                    Click="OnPrevious"/>
-                            <Button x:Name="PlayButton" Style="{StaticResource IconButton}" Content="&#xE768;"
-                                    FontSize="24" Width="48" Height="48" Margin="18,0" Click="OnPlayPause"/>
-                            <Button x:Name="NextButton" Style="{StaticResource IconButton}" Content="&#xE893;"
-                                    Click="OnNext"/>
-                        </StackPanel>
+                        <Grid Grid.Row="3">
+                            <StackPanel x:Name="MediaAiPanel" Orientation="Horizontal" HorizontalAlignment="Left"
+                                        VerticalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Button x:Name="PrevButton" Style="{StaticResource IconButton}" Content="&#xE892;"
+                                        Click="OnPrevious"/>
+                                <Button x:Name="PlayButton" Style="{StaticResource IconButton}" Content="&#xE768;"
+                                        FontSize="24" Width="48" Height="48" Margin="18,0" Click="OnPlayPause"/>
+                                <Button x:Name="NextButton" Style="{StaticResource IconButton}" Content="&#xE893;"
+                                        Click="OnNext"/>
+                            </StackPanel>
+                        </Grid>
                     </Grid>
                 </Grid>
 
@@ -301,6 +339,6 @@
                 </Grid>
 
             </Grid>
-        </Border>
+        </Grid>
     </Grid>
 </Window>

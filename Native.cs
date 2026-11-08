@@ -118,6 +118,164 @@ internal static class Native
     [DllImport("shcore.dll")]
     public static extern int GetDpiForMonitor(IntPtr hMonitor, int dpiType, out uint dpiX, out uint dpiY);
 
+    // ---- Window enumeration & control (dock, AI handoff) --------------------------------------
+
+    public const long WS_EX_TRANSPARENT = 0x00000020;
+    public const long WS_EX_APPWINDOW = 0x00040000;
+    public const int SW_RESTORE = 9;
+    public const int SW_MINIMIZE = 6;
+    public const int WM_CLOSE = 0x0010;
+    private const uint GW_OWNER = 4;
+    private const int DWMWA_CLOAKED = 14;
+    private const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+
+    public delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool IsWindowVisible(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool IsIconic(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetWindow(IntPtr hwnd, uint cmd);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetWindowTextW(IntPtr hwnd, char[] text, int max);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool ShowWindow(IntPtr hwnd, int cmd);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool PostMessage(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmGetWindowAttribute(IntPtr hwnd, int attribute, out int value, int size);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
+
+    [DllImport("kernel32.dll")]
+    private static extern bool CloseHandle(IntPtr handle);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    private static extern bool QueryFullProcessImageNameW(IntPtr process, int flags, char[] name, ref int size);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetApplicationUserModelId(IntPtr process, ref int length, char[]? id);
+
+    [DllImport("user32.dll")]
+    public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
+
+    public static string WindowTitle(IntPtr hwnd)
+    {
+        var buffer = new char[256];
+        int n = GetWindowTextW(hwnd, buffer, buffer.Length);
+        return n > 0 ? new string(buffer, 0, n) : "";
+    }
+
+    /// <summary>True for windows that would appear in Alt+Tab / on the taskbar.</summary>
+    public static bool IsAppWindow(IntPtr hwnd)
+    {
+        if (!IsWindowVisible(hwnd) || GetWindow(hwnd, GW_OWNER) != IntPtr.Zero) return false;
+        long ex = GetWindowLongPtr(hwnd, GWL_EXSTYLE).ToInt64();
+        if ((ex & WS_EX_TOOLWINDOW) != 0 && (ex & WS_EX_APPWINDOW) == 0) return false;
+        if (DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, out int cloaked, sizeof(int)) == 0 && cloaked != 0) return false;
+        if (ShellClasses.Contains(WindowClass(hwnd))) return false; // desktop and taskbars (owned by explorer.exe)
+        return WindowTitle(hwnd).Length > 0;
+    }
+
+    private static readonly HashSet<string> ShellClasses = ["Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd"];
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassNameW(IntPtr hwnd, char[] name, int max);
+
+    private static string WindowClass(IntPtr hwnd)
+    {
+        var buffer = new char[128];
+        int n = GetClassNameW(hwnd, buffer, buffer.Length);
+        return n > 0 ? new string(buffer, 0, n) : "";
+    }
+
+    public static (string? Path, string? Aumid) ProcessIdentity(uint pid)
+    {
+        IntPtr process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+        if (process == IntPtr.Zero) return (null, null);
+        try
+        {
+            var name = new char[1024];
+            int size = name.Length;
+            string? path = QueryFullProcessImageNameW(process, 0, name, ref size) ? new string(name, 0, size) : null;
+
+            int length = 0;
+            string? aumid = null;
+            if (GetApplicationUserModelId(process, ref length, null) == 122 /* ERROR_INSUFFICIENT_BUFFER */ && length > 0)
+            {
+                var id = new char[length];
+                if (GetApplicationUserModelId(process, ref length, id) == 0) aumid = new string(id, 0, length - 1);
+            }
+            return (path, aumid);
+        }
+        finally
+        {
+            CloseHandle(process);
+        }
+    }
+
+    /// <summary>Presses a key combination (e.g. Ctrl+V) in whatever window has focus.</summary>
+    public static void SendKeys(params byte[] keys)
+    {
+        foreach (var k in keys) keybd_event(k, 0, 0, UIntPtr.Zero);
+        for (int i = keys.Length - 1; i >= 0; i--) keybd_event(keys[i], 0, 2, UIntPtr.Zero);
+    }
+
+    // ---- App bar (dock space reservation, Windows taskbar auto-hide) ---------------------------
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct APPBARDATA
+    {
+        public int cbSize;
+        public IntPtr hWnd;
+        public uint uCallbackMessage;
+        public uint uEdge;
+        public RECT rc;
+        public IntPtr lParam;
+    }
+
+    public const uint ABM_NEW = 0, ABM_REMOVE = 1, ABM_QUERYPOS = 2, ABM_SETPOS = 3, ABM_GETSTATE = 4, ABM_SETSTATE = 10;
+    public const uint ABE_BOTTOM = 3;
+    public const int ABS_AUTOHIDE = 1, ABS_ALWAYSONTOP = 2;
+    public const int ABN_POSCHANGED = 1, ABN_FULLSCREENAPP = 2;
+
+    [DllImport("shell32.dll")]
+    public static extern IntPtr SHAppBarMessage(uint message, ref APPBARDATA data);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern uint RegisterWindowMessage(string name);
+
+    /// <summary>Windows taskbar auto-hide on/off.</summary>
+    public static bool TaskbarAutoHide
+    {
+        get
+        {
+            var data = new APPBARDATA { cbSize = Marshal.SizeOf<APPBARDATA>() };
+            return ((int)SHAppBarMessage(ABM_GETSTATE, ref data) & ABS_AUTOHIDE) != 0;
+        }
+        set
+        {
+            var data = new APPBARDATA { cbSize = Marshal.SizeOf<APPBARDATA>(), lParam = new IntPtr(value ? ABS_AUTOHIDE : ABS_ALWAYSONTOP) };
+            SHAppBarMessage(ABM_SETSTATE, ref data);
+        }
+    }
+
     // ---- Misc -------------------------------------------------------------------------------
 
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]

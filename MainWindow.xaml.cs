@@ -12,12 +12,13 @@ namespace DynaIsland;
 
 public partial class MainWindow : Window
 {
-    private enum IslandState { Idle, Clock, Compact, Peek, Expanded, Timer, TimerExpanded, Alert, Notify, Shot }
+    private enum IslandState { Idle, Clock, Compact, Peek, Expanded, Timer, TimerExpanded, Alert, Notify, Shot, Chat }
 
     private static readonly Dictionary<IslandState, (double W, double H, double R)> Shapes = new()
     {
         [IslandState.Idle] = (120, 30, 15),
-        [IslandState.Clock] = (300, 42, 21),
+        [IslandState.Clock] = (390, 152, 38),
+        [IslandState.Chat] = (440, 58, 29),
         [IslandState.Compact] = (280, 34, 17),
         [IslandState.Peek] = (360, 54, 27),
         [IslandState.Expanded] = (400, 176, 40),
@@ -53,6 +54,9 @@ public partial class MainWindow : Window
     private readonly FolderWatchService _folders;
     private readonly NotificationService _notifications;
     private readonly CalendarService _calendar;
+    private readonly SideHud _volumeHud = new(SideHud.Edge.Right);
+    private readonly SideHud _brightnessHud = new(SideHud.Edge.Left);
+    private readonly DockWindow _dock;
     private readonly Spring _w, _h, _r;
     private readonly DateTime _startedAt = DateTime.Now;
     private readonly Forms.ContextMenuStrip _menu;
@@ -114,6 +118,8 @@ public partial class MainWindow : Window
         _notifications.Received += (_, toast) => OnToast(toast);
         _calendar = new CalendarService(Dispatcher);
         _calendar.Upcoming += (_, meeting) => OnMeeting(meeting);
+        _calendar.EventsChanged += (_, _) => UpdateCalendarUi();
+        _dock = new DockWindow(_settings, _settings.Save);
 
         _fastPoll = MakeTimer(120, PollInputs, start: true);
         _slowPoll = MakeTimer(1000, SlowTick, start: true);
@@ -137,12 +143,16 @@ public partial class MainWindow : Window
         EnsureAutoStart();
 
         SourceInitialized += OnSourceInitialized;
+        Deactivated += (_, _) => { if (_chatApp is not null) CloseChat(); };
         Loaded += async (_, _) =>
         {
             ApplyAppearance();
             ApplyShape();
             UpdateIdleOpacity();
             ApplyVisibility();
+            ApplyDock();
+            UpdateCalendarUi();
+            await Dispatcher.InvokeAsync(LoadAiApps, DispatcherPriority.Background);
             await _media.StartAsync();
         };
         SizeChanged += (_, _) => PositionWindow();
@@ -152,7 +162,7 @@ public partial class MainWindow : Window
     }
 
     private IEnumerable<FrameworkElement> AllViews =>
-        [IdleView, ClockView, CompactView, PeekView, ExpandedView, TimerView, TimerExpandedView, AlertView, NotifyView, ShotView];
+        [IdleView, ClockView, CompactView, PeekView, ExpandedView, TimerView, TimerExpandedView, AlertView, NotifyView, ShotView, ChatView];
 
     private FrameworkElement ViewFor(IslandState state) => state switch
     {
@@ -165,6 +175,7 @@ public partial class MainWindow : Window
         IslandState.Alert => AlertView,
         IslandState.Notify => NotifyView,
         IslandState.Shot => ShotView,
+        IslandState.Chat => ChatView,
         _ => IdleView,
     };
 
@@ -217,6 +228,10 @@ public partial class MainWindow : Window
         _folders.Dispose();
         _notifications.Dispose();
         _calendar.Dispose();
+        _dock.Close();
+        _volumeHud.Close();
+        _brightnessHud.Close();
+        RestoreTaskbar();
     }
 
     private void OnDisplaySettingsChanged(object? sender, EventArgs e) => Dispatcher.InvokeAsync(PositionWindow);
@@ -245,6 +260,7 @@ public partial class MainWindow : Window
         {
             _fullscreenHidden = fullscreen;
             ApplyVisibility();
+            ApplyDock();
         }
 
         CheckDoNotDisturb();
@@ -275,6 +291,7 @@ public partial class MainWindow : Window
         bool timer = _timer.IsActive;
 
         var target =
+            _chatApp is not null ? IslandState.Chat :
             _transient is { } t ? t :
             Engaged && timer && (_timerFocused || media is null) ? IslandState.TimerExpanded :
             Engaged && media is not null ? IslandState.Expanded :
@@ -311,7 +328,11 @@ public partial class MainWindow : Window
         if (next == IslandState.Expanded) UpdateProgress();
         if (next is IslandState.Timer or IslandState.TimerExpanded) UpdateTimerUi();
         if (next == IslandState.Expanded || _timer.IsActive) _uiTick.Start();
-        if (next == IslandState.Clock) UpdateClock();
+        if (next == IslandState.Clock)
+        {
+            UpdateClock();
+            UpdateCalendarUi();
+        }
     }
 
     private void FadeIn(FrameworkElement view)
@@ -353,13 +374,14 @@ public partial class MainWindow : Window
         // Not fully transparent so the faded pill can still be hovered (alpha 0 pixels are click-through).
         var anim = new DoubleAnimation(fade ? 0.02 : 1, TimeSpan.FromMilliseconds(fade ? 600 : 150));
         Island.BeginAnimation(OpacityProperty, anim);
-        Shadow.BeginAnimation(OpacityProperty, new DoubleAnimation(fade ? 0 : ShadowOpacity, anim.Duration));
+        ShadowHost.BeginAnimation(OpacityProperty, new DoubleAnimation(fade ? 0 : ShadowOpacity, anim.Duration));
     }
 
     // ---- Transient cards (alerts, notifications, screenshots) --------------------------------
 
     private void ShowTransient(IslandState kind, int milliseconds, Action? onClick)
     {
+        if (_chatApp is not null) return; // don't interrupt typing
         _transient = kind;
         _transientClick = onClick;
         _transientTimer.Stop();
@@ -481,16 +503,46 @@ public partial class MainWindow : Window
         double w = Math.Max(1, _w.Value);
         double h = Math.Max(1, _h.Value);
         double r = Math.Clamp(_r.Value, 0, Math.Min(w, h) / 2);
-        var corner = new CornerRadius(r);
+        var outline = IsNotch ? NotchOutline(w, h, r) : new RectangleGeometry(new Rect(0, 0, w, h), r, r);
+        outline.Freeze();
 
-        Island.Width = w;
-        Island.Height = h;
-        Island.CornerRadius = corner;
-        Shadow.Width = w;
-        Shadow.Height = h;
-        Shadow.CornerRadius = corner;
-        Stage.Clip = new RectangleGeometry(new Rect(0, 0, w, h), r, r);
+        Island.Width = IslandShape.Width = ShadowHost.Width = ShadowShape.Width = w;
+        Island.Height = IslandShape.Height = ShadowHost.Height = ShadowShape.Height = h;
+        IslandShape.Data = ShadowShape.Data = outline;
+        Stage.Clip = outline;
         PlaceSideItems(w);
+    }
+
+    private bool IsNotch => _settings.Shape == "Notch";
+
+    /// <summary>
+    /// Notch outline joined to the top edge: square top, rounded bottom corners, and concave "ears"
+    /// curving out into the screen edge on both sides (they extend past the island's bounds).
+    /// </summary>
+    private static Geometry NotchOutline(double w, double h, double r)
+    {
+        double e = Math.Min(10, r);
+        r = Math.Max(0, Math.Min(r, h - e));
+        var f = new PathFigure { StartPoint = new Point(-e, 0), IsClosed = true };
+        f.Segments.Add(new ArcSegment(new Point(0, e), new Size(e, e), 0, false, SweepDirection.Clockwise, true));
+        f.Segments.Add(new LineSegment(new Point(0, h - r), true));
+        f.Segments.Add(new ArcSegment(new Point(r, h), new Size(r, r), 0, false, SweepDirection.Counterclockwise, true));
+        f.Segments.Add(new LineSegment(new Point(w - r, h), true));
+        f.Segments.Add(new ArcSegment(new Point(w, h - r), new Size(r, r), 0, false, SweepDirection.Counterclockwise, true));
+        f.Segments.Add(new LineSegment(new Point(w, e), true));
+        f.Segments.Add(new ArcSegment(new Point(w + e, 0), new Size(e, e), 0, false, SweepDirection.Clockwise, true));
+        return new PathGeometry([f]);
+    }
+
+    /// <summary>Floating island sits 6 px below the top edge; the notch touches it.</summary>
+    private void ApplyShapeMode()
+    {
+        double top = IsNotch ? 0 : 6;
+        Island.Margin = new Thickness(0, top, 0, 0);
+        ShadowHost.Margin = new Thickness(0, top + 2, 0, 0);
+        SideBubble.Margin = new Thickness(0, top, 0, 0);
+        PrivacyDots.Margin = new Thickness(0, top + 11, 0, 0);
+        ApplyShape();
     }
 
     /// <summary>Keeps the timer bubble and privacy dots just to the right of the island as it morphs.</summary>

@@ -21,9 +21,16 @@ Everything runs locally. The app makes no network calls, collects no telemetry a
 | **Keyboard layout** | Shows the new layout (e.g. العربية / English) when you switch. |
 | **Do Not Disturb** | On/off. |
 | **Battery, Caps Lock, clipboard** | Charger plugged/unplugged and low battery; Caps Lock on/off; "Copied" with a short preview (password-manager content is never previewed). |
-| **Clock** | Hovering the idle island shows the time, date and battery. |
+| **Home card** | Hovering the idle island shows the time, date, battery, your next calendar events, and AI shortcuts. |
+| **AI shortcuts** | Claude, ChatGPT and Antigravity, with their own app icons, on the Home card and in the expanded player. Click one and the island becomes a prompt box. **Enter** opens that app and hands it your text: Claude gets it through its `claude://` link, ChatGPT gets it pasted into its focused message box, and for Antigravity it's copied for you to paste into the Agent chat. DynaIsland itself makes no network calls. "Send automatically" (AI menu) also presses Enter in the app, but only when its message box has focus. |
 
-The island hides while a full-screen app or game is running. It never steals focus and doesn't appear in Alt+Tab or the taskbar.
+The island hides while a full-screen app or game is running. It never steals focus (except while you type in the AI box) and doesn't appear in Alt+Tab or the taskbar.
+
+**Island or notch:** *Appearance → Shape* switches between a floating pill and a notch joined to the top edge, whose curved "ears" blend into the screen edge.
+
+**Side pop-ups:** volume (including mute) slides in from the right edge and brightness from the left, as notch-shaped pills attached to the screen edge. Turn it off under *Appearance* to show them in the island instead.
+
+**Dock:** a macOS-style dock at the bottom of the screen with pinned apps (first seeded from your Windows taskbar pins), running apps, and the Recycle Bin. It has hover magnification, running dots and a launch bounce. Click an app to open, switch to or minimize it (repeated clicks cycle its windows); right-click for its windows, New window, Keep in Dock / Remove from Dock, and Quit. By default it reserves its space like the Windows taskbar, so maximized windows stop above it. *Dock → Hide the Windows taskbar* switches the Windows taskbar to auto-hide, and quitting DynaIsland restores it.
 
 ## Controls and settings
 
@@ -87,7 +94,12 @@ Services/AudioVolume          Core Audio volume and mute (speakers and mic)
 Services/PowerService         battery / charger events
 Services/TimerService         timer state
 Services/NotificationService  toast mirroring (read-only wpndatabase via winsqlite3)
-Services/ShellApps            app name and icon from an AppUserModelID
+Services/ShellApps            app names, icons, installed apps, window/shortcut IDs
+Services/WindowTracker        top-level app windows (dock)
+Services/AiHandoff            hand a prompt to Claude / ChatGPT / Antigravity
+SideHud.cs                    edge pop-ups for volume and brightness
+DockWindow.cs                 macOS-style dock (app bar)
+MainWindow.Ai.cs              Home card calendar, AI buttons and prompt box
 Services/CalendarService      classic Outlook calendar (COM, read-only)
 Services/BluetoothService     paired device connect / disconnect / battery
 Services/NetworkService       Wi-Fi / Ethernet / offline / VPN

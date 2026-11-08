@@ -94,6 +94,11 @@ public partial class MainWindow
     private void ShowVolumeAlert(float level, bool muted)
     {
         string glyph = muted || level < 0.005f ? "" : level < 0.34f ? "" : level < 0.67f ? "" : "";
+        if (_settings.SidePopups && !_fullscreenHidden)
+        {
+            _volumeHud.ShowLevel(glyph, muted ? 0 : level, muted ? "Muted" : $"{Math.Round(level * 100)}", CurrentMonitor());
+            return;
+        }
         ShowAlert(glyph, muted ? "Muted" : "Volume", muted ? "" : $"{Math.Round(level * 100)}",
             muted ? 0 : level, ColorUtil.Neutral);
     }
@@ -121,6 +126,11 @@ public partial class MainWindow
         _lastBrightness = level;
         if (first || !changed || !_settings.ShowBrightness) return;
 
+        if (_settings.SidePopups && !_fullscreenHidden)
+        {
+            _brightnessHud.ShowLevel("", level / 100.0, $"{level}", CurrentMonitor());
+            return;
+        }
         ShowAlert("", "Brightness", $"{level}", level / 100.0, ColorUtil.Neutral);
     }
 
@@ -160,6 +170,7 @@ public partial class MainWindow
 
     private void OnClipboardChanged()
     {
+        if (DateTime.Now < _suppressClipboardUntil) return;
         string detail;
         try
         {
