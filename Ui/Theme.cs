@@ -104,9 +104,12 @@ public static class Theme
             if (key?.GetValue("AccentColor") is int abgr)
             {
                 var c = Color.FromRgb((byte)(abgr & 0xFF), (byte)((abgr >> 8) & 0xFF), (byte)((abgr >> 16) & 0xFF));
-                // Keep it readable as a fill behind white text.
+                // Use it only if it's clearly coloured (a grey accent makes "on" look like "off")
+                // and dark enough to carry white text.
+                int max = Math.Max(c.R, Math.Max(c.G, c.B)), min = Math.Min(c.R, Math.Min(c.G, c.B));
+                double saturation = max == 0 ? 0 : (max - min) / (double)max;
                 double luma = 0.2126 * c.R + 0.7152 * c.G + 0.0722 * c.B;
-                if (luma < 200) return c;
+                if (saturation > 0.35 && luma is > 40 and < 200) return c;
             }
         }
         catch

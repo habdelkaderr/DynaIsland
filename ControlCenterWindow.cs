@@ -155,53 +155,100 @@ internal sealed class ControlCenterWindow : GlassPopup
         if (network?.Vpn is { } vpn)
         {
             stack.Children.Add(Ux.Gap(12));
-            stack.Children.Add(Row(Ux.RoundButton("", true, 30, () => { Dismiss(); SystemActions.OpenSettings("network-vpn"); }), "VPN", vpn));
+            stack.Children.Add(Row(Ux.RoundButton("", true, 30, () => { Dismiss(); SystemActions.OpenSettings("network-vpn"); }), "VPN", vpn).Row);
         }
         return Ux.Tile(stack, 16);
     }
 
-    /// <summary>Real radio toggle; when Windows refuses control the button opens Settings instead.</summary>
+    /// <summary>
+    /// Real radio toggle. It flips immediately when pressed (like macOS), then Windows confirms through
+    /// the radio's change event; if Windows refuses, it flips back and Settings opens.
+    /// </summary>
     private UIElement RadioRow(string glyph, string title, bool? on, string status, RadioKind kind, string page)
     {
         var button = Ux.RoundButton(glyph, on == true, 30);
+        var (row, statusText) = Row(button, title, status);
+        bool state = on == true;
         button.MouseLeftButtonUp += async (_, e) =>
         {
             e.Handled = true;
-            if (on is bool current && _host.Radios.CanControl && await _host.Radios.SetAsync(kind, !current)) return;
+            if (on is null || !_host.Radios.CanControl)
+            {
+                Dismiss();
+                SystemActions.OpenSettings(page);
+                return;
+            }
+            state = !state;
+            Ux.SetOn(button, state);
+            statusText.Text = state ? "On" : "Off";
+            if (await _host.Radios.SetAsync(kind, state)) return;
+            state = !state; // refused: put it back
+            Ux.SetOn(button, state);
+            statusText.Text = status;
             Dismiss();
             SystemActions.OpenSettings(page);
         };
-        return Row(button, title, status);
+        return row;
     }
 
-    private static UIElement Row(Border button, string title, string status)
+    private static (UIElement Row, TextBlock Status) Row(Border button, string title, string status)
     {
         var text = new StackPanel { Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
         text.Children.Add(Ux.Text(title, 13, weight: FontWeights.SemiBold));
         var s = Ux.Text(status, 11.5, "Ui.TextSecondary");
         s.MaxWidth = 95;
         text.Children.Add(s);
-        return new StackPanel { Orientation = Orientation.Horizontal, Children = { button, text } };
+        return (new StackPanel { Orientation = Orientation.Horizontal, Children = { button, text } }, s);
     }
 
+    /// <summary>Do Not Disturb: a real toggle (presses Windows' own button; see SystemActions).</summary>
     private UIElement DoNotDisturb()
     {
         bool on = Native.IsDoNotDisturbOn() == true;
         var button = Ux.RoundButton("", on, 30);
-        var tile = Ux.Tile(Row(button, "Focus", on ? "Do Not Disturb" : "Off"), 16, new Thickness(10));
+        var (row, status) = Row(button, "Focus", on ? "Do Not Disturb" : "Off");
+        var tile = Ux.Tile(row, 16, new Thickness(10));
         tile.Cursor = Cursors.Hand;
-        tile.MouseLeftButtonUp += (_, _) => { Dismiss(); SystemActions.OpenNotificationCenter(); };
-        tile.ToolTip = "Opens Windows' notification center, where Do Not Disturb is switched";
+        bool busy = false;
+        tile.MouseLeftButtonUp += async (_, _) =>
+        {
+            if (busy) return;
+            busy = true;
+            on = !on;
+            Ux.SetOn(button, on);
+            status.Text = on ? "Do Not Disturb" : "Off";
+            CloseOnDeactivate = false; // the notification center briefly takes focus
+            bool ok = await SystemActions.ToggleDoNotDisturbAsync();
+            CloseOnDeactivate = true;
+            if (!ok)
+            {
+                on = Native.IsDoNotDisturbOn() == true;
+                Ux.SetOn(button, on);
+                status.Text = on ? "Do Not Disturb" : "Off";
+            }
+            Activate();
+            busy = false;
+        };
         return tile;
     }
 
+    /// <summary>Windows light/dark theme: flips immediately and changes the real Windows setting.</summary>
     private UIElement Appearance()
     {
         bool light = Theme.WindowsUsesLightTheme();
         var button = Ux.RoundButton(light ? "" : "", !light, 30);
-        var tile = Ux.Tile(Row(button, light ? "Light Mode" : "Dark Mode", "Windows theme"), 16, new Thickness(10));
+        var (row, status) = Row(button, light ? "Light Mode" : "Dark Mode", "Windows theme");
+        var title = (TextBlock)((StackPanel)((StackPanel)row).Children[1]).Children[0];
+        var tile = Ux.Tile(row, 16, new Thickness(10));
         tile.Cursor = Cursors.Hand;
-        tile.MouseLeftButtonUp += (_, _) => Theme.SetWindowsLightTheme(!light); // the real Windows setting
+        tile.MouseLeftButtonUp += (_, _) =>
+        {
+            light = !light;
+            Ux.SetOn(button, !light);
+            ((TextBlock)button.Child).Text = light ? "" : "";
+            title.Text = light ? "Light Mode" : "Dark Mode";
+            Theme.SetWindowsLightTheme(light); // the real Windows setting
+        };
         return tile;
     }
 

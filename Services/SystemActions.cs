@@ -61,6 +61,51 @@ public static class SystemActions
         if (GoTarget(item) is { } target) ShellApps.Start("explorer.exe", $"\"{target}\"");
     }
 
+    /// <summary>
+    /// Switches Windows' Do Not Disturb. There is no public API for it, so this presses the real
+    /// "Do not disturb" button in Windows' notification center (UI Automation) and closes it again.
+    /// Returns false if the button couldn't be found; the center is then left open for the user.
+    /// </summary>
+    public static async Task<bool> ToggleDoNotDisturbAsync()
+    {
+        bool? before = Native.IsDoNotDisturbOn();
+        OpenNotificationCenter();
+        bool pressed = await Task.Run(() =>
+        {
+            for (int attempt = 0; attempt < 30; attempt++)
+            {
+                try
+                {
+                    var center = System.Windows.Automation.AutomationElement.RootElement.FindFirst(System.Windows.Automation.TreeScope.Children,
+                        new System.Windows.Automation.PropertyCondition(System.Windows.Automation.AutomationElement.NameProperty, "Notification Center"));
+                    var button = center?.FindFirst(System.Windows.Automation.TreeScope.Descendants,
+                        new System.Windows.Automation.PropertyCondition(System.Windows.Automation.AutomationElement.NameProperty, "Do not disturb"));
+                    if (button is not null)
+                    {
+                        if (button.TryGetCurrentPattern(System.Windows.Automation.TogglePattern.Pattern, out var toggle))
+                            ((System.Windows.Automation.TogglePattern)toggle).Toggle();
+                        else if (button.TryGetCurrentPattern(System.Windows.Automation.InvokePattern.Pattern, out var invoke))
+                            ((System.Windows.Automation.InvokePattern)invoke).Invoke();
+                        else return false;
+                        return true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("dnd", ex);
+                }
+                Thread.Sleep(100);
+            }
+            return false;
+        });
+        if (!pressed) return false;
+
+        await Task.Delay(250);
+        Native.SendKeys(0x1B); // Esc closes the notification center
+        await Task.Delay(400);
+        return Native.IsDoNotDisturbOn() != before;
+    }
+
     private static bool Confirm(string text, string title) =>
         MessageBox.Show(text, title, MessageBoxButton.OKCancel, MessageBoxImage.Question, MessageBoxResult.Cancel) == MessageBoxResult.OK;
 

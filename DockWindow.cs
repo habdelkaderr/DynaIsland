@@ -96,6 +96,7 @@ internal sealed class DockWindow : Window
         Title = "DynaIsland dock";
         FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI");
         AllowDrop = true;
+        UseLayoutRounding = true; // icons on whole device pixels: sharp, not smeared
 
         _plate = new Border
         {

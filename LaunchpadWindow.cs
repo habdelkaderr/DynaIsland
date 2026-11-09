@@ -58,6 +58,7 @@ internal sealed class LaunchpadWindow : Window
         ShowInTaskbar = false;
         Topmost = true;
         Title = "Launchpad";
+        UseLayoutRounding = true; // icons on whole device pixels: sharp, not smeared
         WindowStartupLocation = WindowStartupLocation.Manual;
         Left = -10000;
         Top = -10000;
