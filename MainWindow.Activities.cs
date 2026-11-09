@@ -32,8 +32,10 @@ public partial class MainWindow
 
     private void PollInputs()
     {
-        if (_settings.ShowVolume && _volume.TryRead(out float level, out bool muted))
+        bool barVisible = _menuBar?.IsVisible == true;
+        if ((_settings.ShowVolume || barVisible) && _volume.TryRead(out float level, out bool muted))
         {
+            _host?.ReportVolume(level, muted); // menu bar and Control Center
             if (_lastVolume < 0 || _volume.DeviceChanged)
             {
                 _lastVolume = level;
@@ -43,7 +45,7 @@ public partial class MainWindow
             {
                 _lastVolume = level;
                 _lastMuted = muted;
-                ShowVolumeAlert(level, muted);
+                if (_settings.ShowVolume) ShowVolumeAlert(level, muted);
             }
         }
 
@@ -73,11 +75,15 @@ public partial class MainWindow
             _lastCaps = null;
         }
 
-        if (_settings.ShowKeyboardLayout)
+        if (_settings.ShowKeyboardLayout || barVisible)
         {
             // Only a change within the same window counts; switching windows isn't a layout switch.
             var (window, language) = Native.ForegroundKeyboardLanguage();
-            if (window == _keyboardWindow && language != _keyboardLanguage && language != 0 && _keyboardLanguage != 0)
+            _host?.ReportKeyboard(language);
+            // When the menu bar already shows the layout, the island stays quiet (no duplicate).
+            bool barShowsIt = barVisible && _settings.MenuBarShowKeyboard;
+            if (_settings.ShowKeyboardLayout && !barShowsIt &&
+                window == _keyboardWindow && language != _keyboardLanguage && language != 0 && _keyboardLanguage != 0)
                 ShowKeyboardAlert(language);
             _keyboardWindow = window;
             _keyboardLanguage = language;
@@ -388,6 +394,7 @@ public partial class MainWindow
 
     private void OnToast(ToastInfo toast)
     {
+        _host?.ReportNotification(); // menu bar bell
         if (!_settings.ShowNotifications || _lastDnd == true || _fullscreenHidden) return;
         var (name, icon) = ShellApps.Lookup(toast.AppId);
         ShowNotice("", icon, name, toast.Title, toast.Body, ColorUtil.Neutral, 5000, () => ShellApps.Launch(toast.AppId));

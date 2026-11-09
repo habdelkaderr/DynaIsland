@@ -10,9 +10,21 @@ public enum AiKind
     Claude,
     ChatGPT,
     Antigravity,
+    /// <summary>Any other app: paste into its focused message box.</summary>
+    Other,
 }
 
-public sealed record AiApp(AiKind Kind, string Name, string Aumid, BitmapSource? Icon);
+/// <summary>An app the island hands prompts to. <see cref="Exe"/> helps recognise its windows.</summary>
+public sealed record AiApp(AiKind Kind, string Name, string Aumid, BitmapSource? Icon, string? Exe = null)
+{
+    /// <summary>Recognises Claude / ChatGPT / Antigravity by name; anything else gets the generic handoff.</summary>
+    public static AiKind KindFor(string name)
+    {
+        foreach (var (kind, names) in AiHandoff.KnownNames)
+            if (names.Any(n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase))) return kind;
+        return AiKind.Other;
+    }
+}
 
 /// <summary>
 /// Hands a prompt typed in the island to an AI's desktop app. DynaIsland itself never talks to the
@@ -20,6 +32,8 @@ public sealed record AiApp(AiKind Kind, string Name, string Aumid, BitmapSource?
 /// </summary>
 public static class AiHandoff
 {
+    internal static IReadOnlyDictionary<AiKind, string[]> KnownNames => StartNames;
+
     private static readonly Dictionary<AiKind, string[]> StartNames = new()
     {
         [AiKind.Claude] = ["Claude"],
@@ -97,8 +111,11 @@ public static class AiHandoff
     private static bool Belongs(AiApp app, AppWindow window)
     {
         if (string.Equals(window.Aumid, app.Aumid, StringComparison.OrdinalIgnoreCase)) return true;
+        if (app.Exe is not null && string.Equals(window.Exe, app.Exe, StringComparison.OrdinalIgnoreCase)) return true;
         string exe = Path.GetFileNameWithoutExtension(window.Exe ?? "");
-        return ProcessHints[app.Kind].Any(h => exe.Contains(h, StringComparison.OrdinalIgnoreCase));
+        var hints = ProcessHints.TryGetValue(app.Kind, out var known) ? known
+            : app.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(w => w.Length >= 4).ToArray();
+        return hints.Any(h => exe.Contains(h, StringComparison.OrdinalIgnoreCase));
     }
 
     private static async Task<bool> WaitForForegroundAsync(AiApp app, TimeSpan timeout)

@@ -56,6 +56,13 @@ public static class ShellApps
         return IconCache[key] = icon;
     }
 
+    /// <summary>Drops cached icons of one size (Launchpad's, when it closes).</summary>
+    public static void ForgetIcons(int size)
+    {
+        string prefix = $"{size}|";
+        foreach (var key in IconCache.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)).ToList()) IconCache.Remove(key);
+    }
+
     /// <summary>Installed apps from Start (name, AppUserModelID).</summary>
     public static List<(string Name, string Aumid)> InstalledApps()
     {
@@ -94,6 +101,31 @@ public static class ShellApps
     {
         var iid = typeof(IPropertyStore).GUID;
         return SHGetPropertyStoreForWindow(hwnd, ref iid, out var store) == 0 ? ReadAumid(store) : null;
+    }
+
+    /// <summary>Target exe of a Start entry (shell:AppsFolder\&lt;id&gt;) that is backed by a shortcut, if any.</summary>
+    public static string? LinkTarget(string parsingName)
+    {
+        try
+        {
+            var iid = typeof(IPropertyStore).GUID;
+            if (SHGetPropertyStoreFromParsingName(parsingName, IntPtr.Zero, 0, ref iid, out var store) != 0 || store is null) return null;
+            try
+            {
+                var key = PKEY_Link_TargetParsingPath;
+                if (store.GetValue(ref key, out var value) != 0) return null;
+                try { return value.vt == 31 ? Marshal.PtrToStringUni(value.p) : null; }
+                finally { PropVariantClear(ref value); }
+            }
+            finally
+            {
+                Marshal.ReleaseComObject(store);
+            }
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>Opens an app by AppUserModelID.</summary>
@@ -181,6 +213,7 @@ public static class ShellApps
     private static readonly Guid FOLDERID_AppsFolder = new("1e87508d-89c2-42f0-8a7e-645a0f50ca58");
     private static readonly Guid BHID_EnumItems = new("94f60519-2850-4924-aa5a-d15e84868039");
     private static readonly PROPERTYKEY PKEY_AppUserModel_ID = new() { fmtid = new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"), pid = 5 };
+    private static readonly PROPERTYKEY PKEY_Link_TargetParsingPath = new() { fmtid = new Guid("B9B4B3FC-2B51-4A42-B5D8-324146AFCF25"), pid = 2 };
 
     [StructLayout(LayoutKind.Sequential)]
     private struct SIZE
@@ -260,6 +293,10 @@ public static class ShellApps
 
     [DllImport("shell32.dll")]
     private static extern int SHGetPropertyStoreForWindow(IntPtr hwnd, ref Guid riid,
+        [MarshalAs(UnmanagedType.Interface)] out IPropertyStore store);
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern int SHGetPropertyStoreFromParsingName(string path, IntPtr pbc, int flags, ref Guid riid,
         [MarshalAs(UnmanagedType.Interface)] out IPropertyStore store);
 
     [DllImport("ole32.dll")] private static extern int PropVariantClear(ref PROPVARIANT value);

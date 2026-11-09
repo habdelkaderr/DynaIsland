@@ -21,18 +21,45 @@ public sealed class PowerService
 
     public event EventHandler<PowerEvent>? Changed;
 
+    /// <summary>Raised on the UI thread whenever the percentage or charging state changes (menu bar, Control Center).</summary>
+    public event EventHandler? StatusChanged;
+
     public PowerService(Dispatcher ui)
     {
         _ui = ui;
         try
         {
             _supply = PowerManager.PowerSupplyStatus;
-            PowerManager.PowerSupplyStatusChanged += (_, _) => _ui.InvokeAsync(OnSupplyChanged);
-            PowerManager.RemainingChargePercentChanged += (_, _) => _ui.InvokeAsync(OnPercentChanged);
+            PowerManager.PowerSupplyStatusChanged += (_, _) => _ui.InvokeAsync(() => { OnSupplyChanged(); StatusChanged?.Invoke(this, EventArgs.Empty); });
+            PowerManager.RemainingChargePercentChanged += (_, _) => _ui.InvokeAsync(() => { OnPercentChanged(); StatusChanged?.Invoke(this, EventArgs.Empty); });
+            PowerManager.BatteryStatusChanged += (_, _) => _ui.InvokeAsync(() => StatusChanged?.Invoke(this, EventArgs.Empty));
         }
         catch (Exception ex)
         {
             Log.Error("power", ex);
+        }
+    }
+
+    public static bool IsCharging
+    {
+        get
+        {
+            try { return PowerManager.BatteryStatus == BatteryStatus.Charging; }
+            catch { return false; }
+        }
+    }
+
+    /// <summary>Estimated time left on battery, when Windows knows it.</summary>
+    public static TimeSpan? TimeRemaining
+    {
+        get
+        {
+            try
+            {
+                var t = PowerManager.RemainingDischargeTime;
+                return t > TimeSpan.Zero && t < TimeSpan.FromDays(2) ? t : null;
+            }
+            catch { return null; }
         }
     }
 

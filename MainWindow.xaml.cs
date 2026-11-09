@@ -151,6 +151,7 @@ public partial class MainWindow : Window
             UpdateCalendarUi();
             await Dispatcher.InvokeAsync(LoadAiApps, DispatcherPriority.Background);
             await _media.StartAsync();
+            await Dispatcher.InvokeAsync(InitDesktop, DispatcherPriority.Background);
         };
         SizeChanged += (_, _) => PositionWindow();
         DpiChanged += (_, _) => Dispatcher.InvokeAsync(PositionWindow, DispatcherPriority.Background);
@@ -197,7 +198,11 @@ public partial class MainWindow : Window
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == Native.WM_CLIPBOARDUPDATE)
+        if (_hotkeys?.Handle(msg, wParam) == true)
+        {
+            handled = true;
+        }
+        else if (msg == Native.WM_CLIPBOARDUPDATE)
         {
             _clipboardDebounce.Stop();
             _clipboardDebounce.Start();
@@ -227,6 +232,7 @@ public partial class MainWindow : Window
         _calendar.Dispose();
         _volumeHud.Close();
         _brightnessHud.Close();
+        CloseDesktop();
     }
 
     private void OnDisplaySettingsChanged(object? sender, EventArgs e) => Dispatcher.InvokeAsync(PositionWindow);
@@ -254,7 +260,8 @@ public partial class MainWindow : Window
         if (fullscreen != _fullscreenHidden)
         {
             _fullscreenHidden = fullscreen;
-            ApplyVisibility();
+            if (_host is not null) ApplyModules(); // menu bar and dock step aside too
+            else ApplyVisibility();
         }
 
         CheckDoNotDisturb();
@@ -528,10 +535,13 @@ public partial class MainWindow : Window
         return new PathGeometry([f]);
     }
 
-    /// <summary>Floating island sits 6 px below the top edge; the notch touches it.</summary>
+    /// <summary>
+    /// Floating island sits 6 px below the top edge (or below the menu bar); the notch touches the top
+    /// edge and sits in the menu bar like a MacBook's.
+    /// </summary>
     private void ApplyShapeMode()
     {
-        double top = IsNotch ? 0 : 6;
+        double top = IsNotch ? 0 : _menuBarInset + 6;
         Island.Margin = new Thickness(0, top, 0, 0);
         ShadowHost.Margin = new Thickness(0, top + 2, 0, 0);
         SideBubble.Margin = new Thickness(0, top, 0, 0);

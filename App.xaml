@@ -52,5 +52,71 @@
             </Setter>
         </Style>
 
+        <!-- Theme brushes for the desktop surfaces; replaced at runtime by Ui.Theme (dark/light). -->
+        <SolidColorBrush x:Key="Ui.Text" Color="#FFF5F5F7"/>
+        <SolidColorBrush x:Key="Ui.TextSecondary" Color="#FFA1A1A6"/>
+        <SolidColorBrush x:Key="Ui.TextFaint" Color="#FF6E6E73"/>
+        <SolidColorBrush x:Key="Ui.Control" Color="#26FFFFFF"/>
+        <SolidColorBrush x:Key="Ui.ControlHover" Color="#3AFFFFFF"/>
+        <SolidColorBrush x:Key="Ui.Tile" Color="#1FFFFFFF"/>
+        <SolidColorBrush x:Key="Ui.Divider" Color="#24FFFFFF"/>
+        <SolidColorBrush x:Key="Ui.Stroke" Color="#30FFFFFF"/>
+        <SolidColorBrush x:Key="Ui.Window" Color="#FF202024"/>
+        <SolidColorBrush x:Key="Ui.Accent" Color="#FF0A84FF"/>
+        <SolidColorBrush x:Key="Ui.OnAccent" Color="White"/>
+
+        <!-- Slim macOS-style slider: thin track, filled to the thumb, white round thumb -->
+        <Style x:Key="Ui.SliderRepeat" TargetType="RepeatButton">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Border Background="Transparent"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="Ui.Slider" TargetType="Slider">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="IsMoveToPointEnabled" Value="True"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid VerticalAlignment="Center">
+                            <Border Height="6" CornerRadius="3" Background="{DynamicResource Ui.ControlHover}"/>
+                            <Track x:Name="PART_Track">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Style="{StaticResource Ui.SliderRepeat}" Command="Slider.DecreaseLarge">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Height="6" CornerRadius="3,0,0,3" Background="{DynamicResource Ui.Text}"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Style="{StaticResource Ui.SliderRepeat}" Command="Slider.IncreaseLarge"/>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Width="18" Height="18">
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Ellipse Fill="White" Stroke="#33000000" StrokeThickness="0.5">
+                                                    <Ellipse.Effect>
+                                                        <DropShadowEffect BlurRadius="4" ShadowDepth="1" Opacity="0.3"/>
+                                                    </Ellipse.Effect>
+                                                </Ellipse>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
     </Application.Resources>
 </Application>

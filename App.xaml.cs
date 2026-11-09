@@ -37,6 +37,8 @@ public partial class App : Application
 
         var settings = Settings.Load();
         if (settings.LowMemoryMode) RenderOptions.ProcessRenderMode = RenderMode.SoftwareOnly;
+        Ui.Theme.Initialize(settings.UiTheme, settings.GlassOpacity);
+        Ui.Motion.Speed = Math.Clamp(settings.AnimationSpeed, 0.5, 2);
 
         var window = new MainWindow(settings);
         MainWindow = window;

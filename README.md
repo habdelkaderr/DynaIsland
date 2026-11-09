@@ -44,6 +44,20 @@ The island hides while a full-screen app or game is running. It never steals foc
 
 Settings: `%APPDATA%\DynaIsland\settings.json` · Log: `%LOCALAPPDATA%\DynaIsland\log.txt`
 
+## Desktop (macOS-style)
+
+Around the island, DynaIsland can run a full desktop layer. **Every part can be switched on or off live** (Settings → General, or tray → Modules), with presets **Everything**, **Island only** and **All off** (stays in the tray). Parts that are off are destroyed rather than hidden, so Island only uses about 32 MB and ~0% CPU.
+
+| Part | What it does |
+|---|---|
+| **Menu bar** | Logo menu (Settings, Launchpad, Sleep/Restart/Shut Down with confirmation, Lock, Sign out), the active app's name with its window menu (switch window, Minimize, Zoom, Close, New Window, Quit), a configurable **Go** menu, then now playing, keyboard layout, Wi-Fi, volume, battery, notifications, Control Center and the clock. Reserves its strip like the taskbar; the island sits in it as the notch. |
+| **Dock** | Launchpad, pinned apps (first seeded from your taskbar pins), running apps and the Recycle Bin, with magnification, running dots, launch bounce and real blur behind it. Drag to reorder, drag off to remove, drop apps from Launchpad to pin. Bottom/left/right, auto-hide, icon size, magnification and spacing. While it's on, the Windows taskbar auto-hides; it's restored when the dock is off or DynaIsland quits (even after a crash). |
+| **Launchpad** | Full-screen grid of every installed app (Windows' own Start list, no hard-coded paths), with search, arrow-key navigation, pages, categories, Frequently Used, In Dock, drag-to-reorder and drag-to-Dock. Built when opened, released when closed. |
+| **Control Center** | Wi-Fi and Bluetooth radios, volume and mute, built-in display brightness, the Windows light/dark theme, now playing, battery, Do Not Disturb status, and shortcuts into Windows Settings. Every control changes the real setting; Do Not Disturb has no public API to set, so its tile opens Windows' own toggle. |
+| **Settings** | One window for everything: modules and presets, island look and activities, island app shortcuts (any app, Ask or Open), dock, menu bar, appearance (auto/dark/light, blur, glass tint, animation speed) and keyboard shortcuts. |
+
+Default shortcuts: **Ctrl+Alt+L** Launchpad, **Ctrl+Alt+C** Control Center, **Ctrl+Alt+D** everything off/on (Settings → Shortcuts to change).
+
 ## Download
 
 Get the portable zip from [Releases](https://github.com/habdelkaderr/DynaIsland/releases): extract it and run `DynaIsland.exe`. No installation or .NET runtime is needed. Each release lists SHA-256 fingerprints for the zip and the exe.

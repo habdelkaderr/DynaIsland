@@ -10,35 +10,46 @@ namespace DynaIsland;
 // Home card (calendar + AI shortcuts) and the AI prompt box.
 public partial class MainWindow
 {
-    private List<AiApp> _aiApps = [];
     private AiApp? _chatApp;
     private DateTime _suppressClipboardUntil;
 
-    // ---- AI ----------------------------------------------------------------------------------
+    // ---- App shortcuts -----------------------------------------------------------------------
 
+    /// <summary>
+    /// Builds the island's app shortcuts from settings (your apps, your order). The first time, they're
+    /// seeded with the AI apps found on this PC.
+    /// </summary>
     private void LoadAiApps()
     {
-        try
+        if (_settings.IslandShortcuts is null)
         {
-            _aiApps = AiHandoff.Discover();
-        }
-        catch (Exception ex)
-        {
-            Log.Error("ai discover", ex);
+            try
+            {
+                _settings.IslandShortcuts = AiHandoff.Discover().Select(a => new IslandShortcut(a.Aumid, Ask: true)).ToList();
+                _settings.Save();
+            }
+            catch (Exception ex)
+            {
+                Log.Error("ai discover", ex);
+                _settings.IslandShortcuts = [];
+            }
         }
 
         AiPanel.Children.Clear();
         MediaAiPanel.Children.Clear();
-        foreach (var app in _aiApps)
+        foreach (var shortcut in _settings.IslandShortcuts)
         {
-            AiPanel.Children.Add(AiButton(app));
-            MediaAiPanel.Children.Add(AiButton(app));
+            var (name, icon) = ShellApps.Lookup(shortcut.Id);
+            string? exe = _settings.DockEnabled || _settings.LaunchpadEnabled ? AppCatalog.Find(shortcut.Id)?.Exe : null;
+            var app = new AiApp(AiApp.KindFor(name), name, shortcut.Id, icon, exe);
+            AiPanel.Children.Add(ShortcutButton(app, shortcut.Ask));
+            MediaAiPanel.Children.Add(ShortcutButton(app, shortcut.Ask));
         }
-        AiPanel.Visibility = _aiApps.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        AiPanel.Visibility = _settings.IslandShortcuts.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     /// <summary>Small icon-only button (the app's own icon); a soft circle appears on hover.</summary>
-    private Button AiButton(AiApp app)
+    private Button ShortcutButton(AiApp app, bool ask)
     {
         var icon = new Image { Source = app.Icon, Width = 18, Height = 18 };
         RenderOptions.SetBitmapScalingMode(icon, BitmapScalingMode.HighQuality);
@@ -49,10 +60,62 @@ public partial class MainWindow
             Width = 30,
             Height = 30,
             Margin = new Thickness(1, 0, 1, 0),
-            ToolTip = $"Ask {app.Name}",
+            ToolTip = ask ? $"Ask {app.Name}" : $"Open {app.Name}",
         };
-        button.Click += (_, _) => OpenChat(app);
+        button.Click += (_, _) =>
+        {
+            if (ask) OpenChat(app);
+            else ShellApps.Launch(app.Aumid);
+        };
+        button.MouseRightButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            ShowShortcutMenu(app);
+        };
         return button;
+    }
+
+    private void ShowShortcutMenu(AiApp app)
+    {
+        var list = _settings.IslandShortcuts ?? [];
+        int index = list.FindIndex(s => s.Id == app.Aumid);
+        var entries = new List<Ui.GlassMenu.Entry>
+        {
+            Ui.GlassMenu.Entry.Header(app.Name),
+            new("Ask (prompt box)", () => SetShortcut(index, ask: true), Checked: index >= 0 && list[index].Ask),
+            new("Open the app", () => SetShortcut(index, ask: false), Checked: index >= 0 && !list[index].Ask),
+            Ui.GlassMenu.Entry.Separator,
+            new("Move Left", () => MoveShortcut(index, -1), Enabled: index > 0),
+            new("Move Right", () => MoveShortcut(index, 1), Enabled: index >= 0 && index < list.Count - 1),
+            new("Remove from Island", () => { list.RemoveAt(index); ShortcutsChanged(); }, Enabled: index >= 0),
+            Ui.GlassMenu.Entry.Separator,
+            new("Edit Shortcuts…", () => OpenSettings("Dynamic Island")),
+        };
+        var cursor = System.Windows.Forms.Cursor.Position;
+        new Ui.GlassMenu(entries, 200) { Blur = _settings.GlassBlur }.ShowAt(cursor.X, cursor.Y + 8, HorizontalAlignment.Center);
+    }
+
+    private void SetShortcut(int index, bool ask)
+    {
+        if (_settings.IslandShortcuts is not { } list || index < 0) return;
+        list[index] = list[index] with { Ask = ask };
+        ShortcutsChanged();
+    }
+
+    private void MoveShortcut(int index, int delta)
+    {
+        if (_settings.IslandShortcuts is not { } list || index < 0) return;
+        int to = Math.Clamp(index + delta, 0, list.Count - 1);
+        (list[index], list[to]) = (list[to], list[index]);
+        ShortcutsChanged();
+    }
+
+    /// <summary>Saves and rebuilds the shortcuts (also called by the Settings window).</summary>
+    private void ShortcutsChanged()
+    {
+        _settings.Save();
+        LoadAiApps();
+        _settingsWindow?.Refresh();
     }
 
     private void OpenChat(AiApp app)

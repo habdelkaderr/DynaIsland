@@ -61,6 +61,21 @@ public sealed class AudioVolume(AudioVolume.Flow flow = AudioVolume.Flow.Playbac
         }
     }
 
+    public void SetMute(bool mute)
+    {
+        try
+        {
+            EnsureEndpoint();
+            if (_endpoint is null) return;
+            var ctx = Guid.Empty;
+            _endpoint.SetMute(mute, ref ctx);
+        }
+        catch
+        {
+            Release();
+        }
+    }
+
     private void EnsureEndpoint()
     {
         DeviceChanged = false;

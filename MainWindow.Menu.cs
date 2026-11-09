@@ -40,7 +40,23 @@ public partial class MainWindow
 
         menu.Items.Add(new Forms.ToolStripLabel("DynaIsland") { Font = new Drawing.Font(MenuFont, Drawing.FontStyle.Bold) });
         menu.Items.Add(new Forms.ToolStripSeparator());
-        menu.Items.Add(Check("Show island", _settings.ShowIsland, SetIslandVisible));
+        menu.Items.Add(Item("Settings…", () => OpenSettings("General")));
+        menu.Items.Add(Item("Launchpad", OpenLaunchpad));
+        menu.Items.Add(Item("Control Center", ToggleControlCenter));
+        menu.Items.Add(new Forms.ToolStripSeparator());
+
+        // Each part on/off, plus one-click presets.
+        menu.Items.Add(Submenu("Modules",
+            Item("Everything on", () => ApplyPreset(true, true)),
+            Item("Island only", () => ApplyPreset(true, false)),
+            Item("All off (stay in tray)", () => ApplyPreset(false, false)),
+            new Forms.ToolStripSeparator(),
+            Toggle("Dynamic Island", () => _settings.ShowIsland, v => _settings.ShowIsland = v),
+            Toggle("Dock", () => _settings.DockEnabled, v => _settings.DockEnabled = v),
+            Toggle("Menu bar", () => _settings.MenuBarEnabled, v => _settings.MenuBarEnabled = v),
+            Toggle("Launchpad", () => _settings.LaunchpadEnabled, v => _settings.LaunchpadEnabled = v),
+            Toggle("Control Center", () => _settings.ControlCenterEnabled, v => _settings.ControlCenterEnabled = v),
+            Toggle("Side pop-ups", () => _settings.SidePopups, v => _settings.SidePopups = v)));
         menu.Items.Add(TimerMenu());
         menu.Items.Add(new Forms.ToolStripSeparator());
 
@@ -196,7 +212,14 @@ public partial class MainWindow
     private void AfterSettingChanged()
     {
         _settings.Save();
+        _settingsWindow?.Refresh(); // keep an open Settings window in sync with the tray menu
+        if (_host is not null)
+        {
+            ApplyModules();
+            return;
+        }
         _lastVolume = -1;
+        ApplyVisibility();
         UpdateState();
     }
 
